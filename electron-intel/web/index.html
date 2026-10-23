@@ -1,0 +1,2176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- ★ 关键：禁止发送 Referer。实测 TapTap 图床对 localhost 来源头返回 HTTP 567，加此即可正常加载 -->
+<meta name="referrer" content="no-referrer">
+<title>游戏情报客户端 · Demo</title>
+<!-- ★v9：主题必须在 CSS 解析之前就定下来，否则首帧会先画出浅色再跳深色（闪一下）。
+     所以这段同步脚本放在 <head>，而不是 body 末尾 —— 那里已经太晚。 -->
+<script>
+(function(){
+  var t = 'dark';   /* 深色为默认（对齐 TapTap 官网） */
+  try{ var v = localStorage.getItem('gi-theme'); if(v === 'light' || v === 'dark') t = v; }catch(e){}
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<style>
+:root{
+  /* ===== 视觉基线：沿用端游看板「浅色优雅风」，未新造风格 ===== */
+  --bg:#f4f6fb; --card:#ffffff; --txt:#1c2333; --sub:#667085; --line:#e4e8f0;
+  --accent:#1e4ed8; --up:#e03e3e; --down:#12a150; --hdr:#1e3a6e; --hdr-txt:#fff;
+  --hover:#f0f4ff; --warn:#b45309; --warnbg:#fff8ed; --ok:#12a150; --okbg:#eefaf3;
+  --imgbg:linear-gradient(160deg,#eef2f9 0%,#e2e9f6 100%);
+
+  /* ===== ★v9 主题化补充 token =====
+     把原先写死在规则里的浅色/灰度收到变量上。浅色下的取值**逐条等于原硬编码**，
+     所以切到浅色时外观与 v8 完全一致（可用截图 md5 反证）；深色只覆盖这一层，
+     布局与规则结构一行不碰 ⇒ 两套主题共用同一份代码。
+     这里刻意用 --sub2/--ph/--dimtxt 三级灰阶，而不是一个 --sub 包打天下。 */
+  --raise:#ffffff;          /* 浮起面：激活分段钮 / 次要按钮 / 大号数字块 */
+  --sunken:#f0f3f9;         /* 内嵌底：分段控件槽 / 名次胶囊 / 比例槽 / kbd */
+  --soft:#f8f9fc;           /* 次级面板底：KV 小卡 / 分区块 / 折叠正文 */
+  --input:#fbfcfe;          /* 输入框常态底 */
+  --panel-a:#f8fafd;        /* 榜头渐变起 */
+  --panel-b:#f2f6fd;        /* 榜头渐变止 */
+  --divider:#f1f4f9;        /* 行级淡分隔线（比 --line 更轻） */
+  --hairline:#c9d6f0;       /* hover 时的边框 */
+  --ph:#b6c1d4;             /* 占位图标 / 极弱文字 */
+  --sub2:#98a2b3;           /* 比 --sub 更弱一档 */
+  --dimtxt:#c3cad8;         /* 「—」这类占位文字 */
+  --dotoff:#c8d3e6;         /* 轮播指示点（未激活） */
+  /* ★ 关键拆分：--hdr 同时被顶栏底与 .hname 标题色引用。深色下顶栏是近黑、
+     标题必须发亮，两者不可能同值 ⇒ 拆出 --title-strong 专管标题。 */
+  --title-strong:#1e3a6e;
+  /* ★ 主色底上的文字色。深色下主色变青绿（亮），白字对比不足 ⇒ 反成深色。 */
+  --on-accent:#ffffff;
+  --ok-line:#bfe8d2;
+  --or:#e0642e; --or-bg:#fff1f0;                        /* 橙：热度 / 关注 */
+  --or2:#c2410c; --or2-bg:#fff5ed; --or2-line:#fadfc8;  /* 深橙：定档 / 预约 */
+  --accent-2:#3b6ef5; --accent-h:#1b45c0;               /* 主色渐变尾 / hover 加深 */
+  --sh1:rgba(30,58,110,.13); --sh2:rgba(30,58,110,.1); --sh3:rgba(18,26,51,.13);
+  --sh-hero:rgba(30,58,110,.06);
+  --ring:rgba(30,78,216,.10); --sh-accent:rgba(30,78,216,.26);
+  --or-line:#fbd0cb;
+  --warn-line:#fadfae; --warn-tx:#7c4a03; --warn-tx-b:#8a4b03; --warn-chip:#fef3c7;
+  /* .dnotice（弹窗内提示）与 .notice 原先**不是同一组棕色**，各自保留原值：
+     统一它们会造成可测的色差，也就不可能拿到「浅色零退化」的结论。 */
+  --note-bg:#fff8e6; --note-line:#f5de9c; --note-tx:#8a5b00; --note-tx-b:#7a4f00;
+  --ok-tint:#f7fdfa;
+  --gn-tx:#047857; --gn-chip:#d1fae5;
+  --info-tx:#0369a1; --info-chip:#e0f2fe;
+  --info-panel:#eef4ff; --info-panel-line:#c9d9f7;
+  --bad-bg:#fef3f2; --bad-line:#fbd0cb; --bad-tx:#b42318;
+  --bar-from:#6f9bff;
+  --tag-bg:rgba(30,58,110,.86);
+  /* ★ 半透明叠色单独保留 α —— 换成不透明纯色会在浅色下产生可测的色差，
+     这几处必须沿用原 α 值，才能保证「浅色像素零退化」 */
+  --code-bg:rgba(255,255,255,.6);
+  --badge-bg:rgba(255,255,255,.95);
+  --dsrc-bg:rgba(30,58,110,.84);
+
+  /* ===== 卡片尺寸基线（做法取自 PC 游戏工作台）===== */
+  --th-ar:16 / 9;      /* 缩略图容器比例【基线】。★v11：此值现在只对 pcNew 生效，
+                          混源 Tab 由 #main 覆盖为 3/2 —— 覆盖规则与实测依据见样式表 §v11 */
+  --cd-lh:1.4;         /* 卡片标题行高 */
+  --cd-t2:2.8em;       /* 标题「固定预留两行」高度 = 2 × --cd-lh */
+  --cd-th-r:9px;       /* 缩略图圆角 */
+  --cd-meta:20px;      /* 元信息区 / 底栏固定高度（单行）⇒ 卡片严格等高 */
+  --mb-th:72px;        /* 手游新游 icon 边长 */
+  --mb-tw:88px;        /* 手游活动 banner 宽 */
+  --mb-sub:1.55em;     /* 手游新游时效行固定高度（单行）⇒ 卡片等高 */
+  --mb-note:2.8em;     /* 手游活动副标题「固定预留两行」 */
+}
+
+/* ===== ★v9 深色主题（取值对齐 TapTap 官网）=====
+   页面底 #161616 / 面板 #1f1f1f / 主色青绿 #00D9C5 / 强调橙 #FF6F38 / 次要文字 #90969C。
+   这里**只覆盖 token，不动任何规则** —— 布局、间距、段序与浅色共用一份代码，
+   所以两套主题不会漂移；改版式时两套一起变。
+   ⚠️ 深色下「主色底 + 白字」对比不足 —— 青绿 #00D9C5 本身是亮色，
+   故 --on-accent 反成深墨绿 #062522，而不是继续用白字。 */
+html[data-theme="dark"]{
+  --bg:#161616; --card:#1f1f1f; --txt:#e8eaed; --sub:#90969c; --line:#2e2e2e;
+  --accent:#00d9c5; --up:#ff6f38; --down:#3ddc97;
+  --hdr:#101010; --hdr-txt:#e8eaed;
+  --hover:#282828; --warn:#f0b429; --warnbg:#2a2419; --ok:#3ddc97; --okbg:#16281f;
+  --imgbg:linear-gradient(160deg,#242424 0%,#1b1b1b 100%);
+
+  --raise:#333333;
+  --sunken:#2a2a2a;
+  --soft:#262626;
+  --input:#242424;
+  --panel-a:#242424; --panel-b:#1f1f1f;
+  --divider:#2a2a2a;
+  --hairline:#3a3a3a;
+  --ph:#4d525a;
+  --sub2:#90969c;
+  --dimtxt:#6b7280;
+  --dotoff:#4a4f57;
+  --title-strong:#f2f4f7;
+  --on-accent:#062522;
+  --ok-line:#235c40;
+  --or:#ff9e64; --or-bg:#2e2118;
+  --or2:#ffab70; --or2-bg:#2e2118; --or2-line:#4a3324;
+  --accent-2:#00c2b0; --accent-h:#00b8a7;
+  --sh1:rgba(0,0,0,.55); --sh2:rgba(0,0,0,.45); --sh3:rgba(0,0,0,.5);
+  --sh-hero:rgba(0,0,0,.35);
+  --ring:rgba(0,217,197,.18); --sh-accent:rgba(0,217,197,.25);
+  --or-line:#4a3324;
+  --warn-line:#4a3d1f; --warn-tx:#f0c674; --warn-tx-b:#f5d48a; --warn-chip:#3a2f16;
+  --note-bg:#2a2419; --note-line:#4a3d1f; --note-tx:#f0c674; --note-tx-b:#f5d48a;
+  --ok-tint:#1a2a22;
+  --gn-tx:#5fd39a; --gn-chip:#16281f;
+  --info-tx:#7cc4f0; --info-chip:#122a3a;
+  --info-panel:#16202e; --info-panel-line:#25364a;
+  --bad-bg:#2e1a1a; --bad-line:#4a2a2a; --bad-tx:#f09595;
+  --bar-from:#00a89a;
+  --tag-bg:rgba(0,0,0,.72);
+  --code-bg:#3a3a3a;
+  --badge-bg:#333333;
+  --dsrc-bg:rgba(0,0,0,.72);
+}
+
+/* ===== ★v9 深色主题的「规则级」补丁 =====
+   上面那层是纯 token 覆盖；下面这几条无法靠换变量解决，必须单独写：
+   来源 pill 在浅色主题是「浅底(.1α) + 深字」，这套配色放到深色背景上会**两头失效**
+   （浅底几乎不可见 + 深字在黑底上看不清）⇒ 深色下反成「半透明底 + 亮字」。 */
+html[data-theme="dark"] .pill.src-xd{background:rgba(11,123,255,.16);border-color:rgba(11,123,255,.34);color:#6aabff}
+html[data-theme="dark"] .pill.src-jidi{background:rgba(230,65,93,.16);border-color:rgba(230,65,93,.34);color:#ff8095}
+html[data-theme="dark"] .pill.src-steam{background:rgba(120,160,220,.16);border-color:rgba(120,160,220,.34);color:#9dbbdf}
+html[data-theme="dark"] .pill.src-taptap{background:rgba(0,151,167,.18);border-color:rgba(0,151,167,.36);color:#43cfdd}
+html[data-theme="dark"] .pill.src-haoyou{background:rgba(234,88,12,.18);border-color:rgba(234,88,12,.36);color:#ff9c5c}
+html[data-theme="dark"] .pill.src-x7{background:rgba(225,29,72,.18);border-color:rgba(225,29,72,.36);color:#ff7a99}
+html[data-theme="dark"] .pill.src-gamersky{background:rgba(99,102,241,.18);border-color:rgba(99,102,241,.36);color:#a5a8f5}
+html[data-theme="dark"] .pill.src-gcores{background:rgba(16,185,129,.18);border-color:rgba(16,185,129,.36);color:#4fd6a8}
+/* 遮罩与弹窗 hero 在深色下要更沉，否则跟页面底分不出层次 */
+html[data-theme="dark"] .mask{background:rgba(0,0,0,.68)}
+html[data-theme="dark"] .dtop{background:#0d0d0d}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+  background:var(--bg); color:var(--txt); font-size:13px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ===== 顶部栏 ===== */
+.topbar{
+  height:52px;flex:0 0 52px;background:var(--hdr);color:var(--hdr-txt);
+  display:flex;align-items:center;gap:14px;padding:0 16px;user-select:none;
+}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;letter-spacing:.3px}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:#63e6be;box-shadow:0 0 8px #63e6be}
+.ver{font-size:11px;opacity:.72;background:rgba(255,255,255,.14);padding:2px 7px;border-radius:4px}
+.topbar .spacer{flex:1}
+.svc{display:flex;align-items:center;gap:6px;font-size:11.5px;opacity:.9}
+.svc i{width:7px;height:7px;border-radius:50%;background:#63e6be;display:block}
+.btn{
+  border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;
+  font-family:inherit;background:rgba(255,255,255,.16);color:#fff;transition:.15s;
+}
+.btn:hover{background:rgba(255,255,255,.28)}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.35)}
+
+/* ===== 布局 ===== */
+.body{flex:1;display:flex;overflow:hidden}
+.nav{
+  width:200px;flex:0 0 200px;background:var(--card);border-right:1px solid var(--line);
+  padding:10px 0;overflow-y:auto;
+}
+.nav h4{font-size:11px;color:var(--sub);padding:9px 18px 5px;font-weight:600;letter-spacing:.6px}
+.nav a{
+  display:flex;align-items:center;gap:9px;padding:8px 18px;color:var(--txt);
+  text-decoration:none;font-size:13px;border-left:3px solid transparent;transition:.12s;
+}
+.nav a:hover{background:var(--hover)}
+.nav a.on{background:var(--hover);border-left-color:var(--ok);font-weight:700;color:var(--accent)}
+.nav a .ico{width:16px;text-align:center;font-size:14px}
+.nav a .cnt{margin-left:auto;font-size:11px;color:var(--sub);background:var(--bg);padding:1px 6px;border-radius:8px}
+.nav .grp{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+
+.main{flex:1;overflow-y:auto;padding:16px 20px 32px}
+.crumb{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.crumb h2{font-size:17px;font-weight:700}
+.srcbadge{
+  font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--line);
+  background:var(--card);color:var(--sub);
+}
+.srcbadge.real{background:var(--okbg);border-color:var(--ok-line);color:var(--ok);font-weight:600}
+.srcbadge.gap{background:var(--warnbg);border-color:var(--warn-line);color:var(--warn);font-weight:600}
+.notice{
+  background:var(--warnbg);border:1px solid var(--warn-line);border-left:3px solid var(--warn);
+  color:var(--warn-tx);padding:9px 12px;border-radius:6px;margin-bottom:14px;font-size:12.5px;
+}
+.notice b{color:var(--warn-tx-b)}
+.notice code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:11.5px}
+.notice.info{background:var(--info-panel);border-color:var(--info-panel-line);border-left-color:var(--accent);color:var(--title-strong)}
+.notice.info b{color:var(--accent)}
+
+/* ===== 筛选 / 排序栏（结构参考 PC 游戏工作台 .filter-bar）===== */
+.filter-bar{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:10px 14px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px;
+}
+.frow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:30px}
+.flb{font-size:12px;font-weight:700;color:var(--sub);letter-spacing:.5px;flex:none;min-width:28px}
+.pills{display:inline-flex;align-items:center;gap:3px;background:var(--sunken);border-radius:11px;padding:3px;flex:none;flex-wrap:wrap}
+.pill-b{
+  display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:650;color:var(--sub);
+  border-radius:8px;padding:5px 12px;cursor:pointer;transition:.14s;white-space:nowrap;
+  font-family:inherit;border:none;background:transparent;line-height:1.35;
+}
+.pill-b:hover{color:var(--accent)}
+.pill-b.on{background:var(--raise);color:var(--accent);box-shadow:0 1px 4px var(--sh3)}
+.pill-b .lb{font-size:9.5px;font-weight:700;letter-spacing:.5px;color:#9aa3b5;opacity:.7}
+.pill-b.on .lb{color:var(--accent);opacity:.62}
+.tg{
+  display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--sub);
+  background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:5px 11px;cursor:pointer;
+  transition:.15s;font-family:inherit;white-space:nowrap;line-height:1.35;flex:none;
+}
+.tg:hover{border-color:var(--accent);color:var(--accent)}
+.tg.on{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--on-accent);border-color:transparent;box-shadow:0 3px 10px var(--sh-accent)}
+.tg .n{font-size:10px;opacity:.7;font-weight:600}
+.fcount{margin-left:auto;font-size:11.5px;color:var(--sub);white-space:nowrap}
+.search{flex:1;min-width:180px;max-width:100%;position:relative}
+.search input{
+  width:100%;padding:7px 12px 7px 30px;border:1px solid var(--line);border-radius:8px;
+  font-family:inherit;font-size:12.5px;background:var(--input);color:var(--txt);outline:none;transition:.15s;
+}
+.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--ring);background:var(--raise)}
+.search .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--sub);font-size:12px;pointer-events:none}
+
+/* ===== 卡片网格 ===== */
+.grid{display:grid;gap:14px}
+/* ★ 统一骨架：PC 端游 5 个 Tab（新游/热游/排行/修改器/MOD）+ 手游「可玩端游」共用 .card */
+.grid.pc{grid-template-columns:repeat(auto-fill,minmax(224px,1fr))}
+/* 手游两个 Tab 走「左侧缩略图 + 右侧文字」的横向紧凑卡；新游右侧多一列大号评分，故列宽更宽 */
+.grid.mb{grid-template-columns:repeat(auto-fill,minmax(336px,1fr));gap:10px}
+
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  transition:.16s;cursor:pointer;display:flex;flex-direction:column;position:relative;
+}
+.card:hover{transform:translateY(-3px);box-shadow:0 8px 20px var(--sh1);border-color:var(--hairline)}
+
+/* 图片：容器定比（--th-ar）＋一律 cover 铺满。
+   ★v7：不再按原图比例切 contain/blur —— 见下方「为什么废掉模糊铺底」。
+   ★v8：**图片可见性完全交给 CSS，不再依赖 onload**。
+   原来 `.cv img{opacity:0}` + `.cv img.ready{opacity:1}`（靠 onload 加 .ready）有一个
+   必然踩中的坑：图片命中缓存（含本地 file:// 与回访）时，`load` 事件可能在节点入树**之前**
+   就已派发 ⇒ `reveal()` 根本不执行 ⇒ `.ready` 永远不加 ⇒ **图加载完了却一直透明**。
+   （实测：mEvent 98 张图 `complete=true / naturalWidth=1080`，`opacity` 却全为 0，截图整片空白。）
+   现在的做法：img 直接可见 + `z-index:1` 压在占位 `.ph` 之上；`reveal()` 只做
+   「把占位标 .gone」这一件优化性的事，**不再决定图能不能看见**。 */
+/* ===== ★v11 按 Tab 自适应的卡位比例（2026-10-15 · 实测驱动）=====
+   实测 651 张图的**原始比例只有两簇**：1:1 方图 297 张（46%）、2.14 宽图 282 张（44%）；
+   而 1.2~1.6 与 ≥2.3 两个区间**一张图都没有**。16:9（1.778）正落在两簇之间的空档里，
+   于是方图被上下切、宽图被左右切 —— 两类都不能幸免，最狠都是 43.8%。
+
+   按「实测的每张图原比例」逐个代入试算（不是按假设的 1:1 / 2.14 手算），
+   格式为 均值裁 / 最狠裁：
+     · 16:9 ： 22~37% / **43.8%**   ← 均值看着不差，但每一屏都有图被裁掉四成
+     · 3:2  ： 30~32% / **33.3%**   ← 均值涨 2~10pp，换最狠降 10.5pp
+     · 1.46 ： 31.6%  / 31.7%       ← 更均匀，但一刀切、且比例不「整」
+
+   ⇒ 混源 Tab 用 3/2；**唯独 pcNew 保留 16:9** ——
+     该页 60 张的源比例区间是 2.14~2.14（纯宽图），16:9 对它已经是最优（裁 16.9%），
+     改成 3:2 反而恶化到 29.9%。
+
+   ⚠️ 挂载点必须放在 #main 上：`--th-ar` 只被 `.cv` 消费，而 `.cv` 全都在 `#main` 内；
+      详情弹窗 `.mask` 挂在 `#main` **之外**，因此不受影响（它自带 contain + 模糊铺底那套逻辑）。
+   ⚠️ 与 JS 的约定：`render()` 会把当前 Tab 写进 `#main.dataset.tab`，作为下面选择器的锚点。 */
+#main{--th-ar:3 / 2}
+#main[data-tab="pcNew"]{--th-ar:16 / 9}
+.cv{position:relative;overflow:hidden;background:var(--imgbg);aspect-ratio:var(--th-ar)}
+.cv img{
+  width:100%;height:100%;object-fit:cover;object-position:center;display:block;
+  position:relative;z-index:1;
+}
+/* ★v7 废掉「近方形原图 → contain + 同图模糊铺底」（v5–v6 的写法）。
+   为什么废：
+     ① 观感差 —— 16:9 卡位里，方图经 contain 只占 **184/327 = 56% 宽**，两侧是
+        模糊底。模糊底再像原图也是一块「脏色条」，一屏里一半满幅一半脏条，
+        用户口径：「端游模块的图片还是未适配，很奇怪」。
+     ② 与基线不一致 —— 本机 PC 游戏工作台（game-aggregator）的**主列表卡**
+        `.row-card .th img` 一直是 `object-fit:cover`；`contain` 只用在它 106px 的
+        小号「同类推荐」横滑卡上（那里太小，裁切会看不清）。本页卡位 224px+，
+        属主线场景 ⇒ 跟 `cover`。
+     ③ 机制本身脆 —— 判比例要读 naturalWidth，缓存命中时 onload 可能早于入树，
+        需要一路空值防御 + syncImgs 补跑（见 §1.2.2）。既然结论是 cover，
+        这一整套判断就不必存在了。
+   代价（明说）：方图用 cover 进 16:9 会**纵向裁掉约 44%**（215×215 → 只见中间一条），
+   方图上的标题/logo 可能被切。这是「满幅统一」换来的，取的是统一。
+   ★v11 变更（2026-10-15）：**已采纳 3:2** —— 理由不是「更看重不裁不切」，
+   而是实测发现 16:9 的「**最狠单张裁切**」恒为 43.8%（每一屏都能挑出被裁掉四成的图），
+   换成 3:2 后降到 33.3%。四档对照见 demo/图片适配对照.html，
+   651 张全量实测与候选对照见 exe-preview/imgfit-review.html。 */
+/* 图挂掉时 .ph 占位：onerror 直接 this.remove()，占位由 .ph 顶上 */
+.cv .ph{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:var(--ph);font-size:30px;
+}
+.cv .ph.gone{display:none}
+
+.tag{
+  position:absolute;top:7px;left:7px;background:var(--tag-bg);color:#fff;z-index:2;
+  font-size:10.5px;padding:2px 7px;border-radius:5px;font-weight:600;letter-spacing:.2px;
+  max-width:66%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+/* 来源色标：按源区分，与 PC 工作台 src-badge 思路一致 */
+.tag.src-xd{background:rgba(11,123,255,.9)}
+.tag.src-jidi{background:rgba(230,65,93,.9)}
+.tag.src-steam{background:rgba(23,55,94,.9)}
+.tag.src-taptap{background:rgba(0,151,167,.9)}
+.tag.src-haoyou{background:rgba(234,88,12,.9)}
+.tag.src-x7{background:rgba(225,29,72,.9)}
+.tag.src-gamersky{background:rgba(99,102,241,.9)}
+.tag.src-gcores{background:rgba(16,185,129,.9)}
+/* 修改器 5 个来源（原来没配色，与其它 Tab 不一致 → v4 补齐） */
+.tag.src-ce{background:rgba(120,113,108,.9)}
+.tag.src-fling{background:rgba(220,38,38,.9)}
+.tag.src-community{background:rgba(100,116,139,.9)}
+.tag.src-xiaoxing{background:rgba(13,148,136,.9)}
+.tag.src-gcm{background:rgba(147,51,234,.9)}
+.tag.tier{background:rgba(18,161,80,.9)}
+.tag.tier.gray{background:rgba(102,112,133,.85)}
+.tag.modk{background:rgba(180,83,9,.88)}
+.badge-tr{
+  position:absolute;top:7px;right:7px;background:var(--badge-bg);color:var(--accent);
+  font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;z-index:2;
+}
+.badge-tr.hot{color:var(--up)}
+.rankno{
+  position:absolute;bottom:0;left:0;background:var(--accent);color:var(--on-accent);font-size:11px;
+  font-weight:700;padding:2px 9px;border-radius:0 6px 0 0;z-index:2;
+}
+
+/* ===== 卡片正文：固定内容布局 ===== */
+.cbody{padding:9px 10px 11px;display:flex;flex-direction:column;gap:6px;flex:1}
+.ctitle{
+  font-size:12.5px;font-weight:600;line-height:var(--cd-lh);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  min-height:var(--cd-t2);           /* ★ 固定预留两行，卡片等高 */
+}
+/* ★v8：英文名统一用（）包含（用户需求①）。括号内的英文比中文小半号、灰度降一档，
+   保证「中文名」仍是视觉主体。例：007 初露锋芒（007 First Light） */
+.ctitle .en{font-weight:500;color:var(--sub);font-size:11.5px}
+.cmeta{display:flex;gap:5px;align-items:center;flex-wrap:nowrap;overflow:hidden;min-height:var(--cd-meta)}
+.crow{display:flex;gap:5px;align-items:center;font-size:11px;color:var(--sub);flex-wrap:nowrap;overflow:hidden}
+.crow.bottom{margin-top:auto;min-height:var(--cd-meta)}
+/* 底栏里的长文本（如「帧数不显示，轻微卡顿」）单行省略，不撑高卡片 */
+.ell{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:10.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
+.pill.hot{background:var(--or-bg);border-color:var(--or-line);color:var(--up);font-weight:600}
+.pill.ok{background:var(--okbg);border-color:var(--ok-line);color:var(--ok);font-weight:600}
+.pill.score{background:var(--warnbg);border-color:var(--warn-line);color:var(--warn);font-weight:700}
+/* 来源标签：与缩略图上的角标同色系，浅底深字（用于手游横向卡） */
+.pill.src-xd{background:rgba(11,123,255,.1);border-color:rgba(11,123,255,.24);color:#0b7bff;font-weight:650}
+.pill.src-jidi{background:rgba(230,65,93,.1);border-color:rgba(230,65,93,.24);color:#d92f4f;font-weight:650}
+.pill.src-steam{background:rgba(23,55,94,.1);border-color:rgba(23,55,94,.24);color:#17375e;font-weight:650}
+.pill.src-taptap{background:rgba(0,151,167,.1);border-color:rgba(0,151,167,.24);color:#00808f;font-weight:650}
+.pill.src-haoyou{background:rgba(234,88,12,.1);border-color:rgba(234,88,12,.24);color:#c2410c;font-weight:650}
+.pill.src-x7{background:rgba(225,29,72,.1);border-color:rgba(225,29,72,.24);color:#be123c;font-weight:650}
+.pill.src-gamersky{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.24);color:#4f46e5;font-weight:650}
+.pill.src-gcores{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.24);color:#059669;font-weight:650}
+
+/* ===== 手游横向卡 =====
+   · 新游 .mcard.nw —— v5 按参考图重做；★v6 起**整卡定高 + 逐行定高**：
+     游戏名长短、标签个数、状态词长短、热度位数都不许改变卡片高度与各行位置
+   · 活动 .mcard    —— banner + 游戏名 + 上线时间 + 活动标题（类目移到右上角） */
+.mcard.nw{align-items:center;padding:26px 12px 11px;gap:12px;height:106px}
+.mcard.nw .mth{border-radius:10px}
+/* ★v8：卡高 96 → 106px、顶部留出 26px「标签带」—— 平台标签改成卡片右上角的绝对定位后，
+   正文整体下移，两者在垂直方向彻底分开（不再靠宽度互相挤）。 */
+.mcard .mtop{
+  position:absolute;top:6px;right:12px;z-index:2;
+  display:flex;gap:3px;align-items:center;justify-content:flex-end;
+  flex-wrap:nowrap;overflow:hidden;max-width:calc(100% - 104px);height:16px;
+}
+.mcard .mtop .pill{font-size:9.5px;line-height:15px;height:16px;padding:0 5px;border-radius:4px;flex:none}
+.mcard .mtop .pill.more{color:var(--sub);font-weight:700;background:var(--sunken)}
+/* ★v6：逐行锁定高度 —— 内容再长也只在自己那一行内省略，不挤动相邻行 */
+.mrow{display:flex;align-items:center;gap:7px;min-width:0;height:20px}
+/* ★v8：这里只放**状态词**（定档 / 预约中 / 已上线），不带日期 ——
+   日期统一由下一行的绿色时效行承载，避免同一时间在卡上出现两次（用户反馈「时间重复」） */
+.mst{flex:none;font-size:11.5px;font-weight:650;color:var(--sub2);white-space:nowrap;max-width:96px;overflow:hidden;text-overflow:ellipsis}
+.mst.pre{color:var(--or2);background:var(--or2-bg);border:1px solid var(--or2-line);border-radius:4px;padding:0 5px}
+.mhot{flex:none;font-size:11px;font-weight:700;color:var(--or);white-space:nowrap;font-variant-numeric:tabular-nums}
+/* 时效信息行：绿色（对应参考图「10月15日 开启…资格招募」那一行）—— 卡上唯一的日期出处 */
+.msub.gn{
+  font-size:11.5px;font-weight:650;color:var(--ok);line-height:18px;height:18px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+/* 右侧大号数字：有评分用绿色 ★；无评分回落到热度（橙色 🔥）；都没有时占位「—」
+   ★v6：**定宽右对齐** —— 数字 1~5 位、有无小数点都不改变左侧正文的可用宽度 */
+.mscore{
+  flex:none;width:76px;display:flex;align-items:baseline;justify-content:flex-end;gap:1px;
+  color:var(--ok);font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;line-height:24px;
+}
+.mscore .ic{font-size:12px;font-weight:700}
+.mscore .v{font-size:20px;letter-spacing:-.4px}
+.mscore.hm{color:var(--or)}
+.mscore.none{color:var(--dimtxt);font-size:18px;font-weight:700}
+
+.mcard{
+  display:flex;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:10px;cursor:pointer;transition:.16s;align-items:center;position:relative;overflow:hidden;
+}
+.mcard:hover{transform:translateY(-2px);box-shadow:0 8px 20px var(--sh1);border-color:var(--hairline)}
+.mth{
+  flex:none;border-radius:9px;overflow:hidden;background:var(--imgbg);position:relative;
+  display:grid;place-items:center;color:var(--ph);font-size:20px;
+}
+.mth.sq{width:var(--mb-th);height:var(--mb-th)}                 /* 新游：方形 icon */
+.mth.wd{width:var(--mb-tw);aspect-ratio:16 / 10}                 /* 活动：横版 banner */
+.mth .ph{
+  position:absolute;inset:0;display:grid;place-items:center;color:var(--ph);font-size:22px;
+}
+.mth .ph.gone{display:none}
+.mth img{width:100%;height:100%;display:block;position:relative;z-index:1}
+.mth.sq img{object-fit:contain;padding:2px}                      /* icon 完整显示，不裁切 */
+.mth.wd img{object-fit:cover}
+.mbd{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.mtl{display:flex;align-items:center;gap:7px;min-width:0;height:20px}
+.mt{flex:1;min-width:0;font-size:13px;font-weight:700;line-height:20px;height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msub{
+  font-size:11.5px;color:var(--sub);line-height:var(--cd-lh);min-height:var(--mb-note);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;
+}
+/* ★v6：标签行恒高 —— 标签 0 个 / 5 个都不改变卡片高度（超出部分裁掉，不换行） */
+.mtags{display:flex;gap:5px;align-items:center;flex-wrap:nowrap;overflow:hidden;height:20px}
+/* ★v8 活动卡：游戏名右侧固定「上线/开始时间」（用户需求④）。
+   定宽不换行 + 游戏名 flex:1 省略 ⇒ 时间再长也挤不动左侧标题区外框。 */
+.mtime{
+  flex:none;font-size:10.5px;font-weight:700;color:var(--ok);white-space:nowrap;
+  font-variant-numeric:tabular-nums;letter-spacing:-.1px;
+}
+/* 活动卡同样逐行锁定（游戏名一行 + 活动标题固定两行）；
+   ★v8：两类手游卡统一 106px 高 + 顶部 26px「标签带」（右上角平台/类目标签专用） */
+.mcard{height:106px;padding-top:26px}
+
+/* ===== ★v8 排行榜：列表式（用户需求②）=====
+   原本是网格缩略图卡，与「排行榜」语义不符。改为**按维度分榜**的列表：
+   每个榜一个区块（榜头 + 若干行），行 = 名次 + 小缩略图 + 名称 + 指标值。
+   各榜内部固定排序，因此不再提供排序按钮（榜单本身就是排序）。 */
+/* ★v9：分榜**并排**（对齐 TapTap 的多列榜）。窄列下行内元素同步精简 ——
+   当时去掉了来源 pill 与比例条，340px 里塞 6 个元素只会挤成一团。 */
+/* ★v10：分榜固定 2 列（2×2），列宽回到 ~590px ⇒ **行内重新放得下「口径标签」**，
+   .rpill 于是被复用为「热度口径标签」（TapTap 关注 / 好游预约…），见 rankBoardsHTML。
+   注意别再用 auto-fit：4 个榜配 3 列会变成 3+1 孤行。 */
+/* ★v10：4 个分榜 ⇒ 固定 2 列（2×2）。
+   不能再沿用 auto-fit/minmax(340px) —— 那个在 1424 宽下排成 3 列，4 个榜就变成 3+1 孤行，
+   和首页精选块原来是同一个毛病。固定 2 列后每榜约 590px，行也终于放得下「口径」小标签。 */
+.rankboards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;margin-bottom:16px}
+.rankboard{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.rbhead{
+  display:flex;align-items:center;gap:9px;padding:11px 14px;
+  background:linear-gradient(180deg,var(--panel-a) 0%,var(--panel-b) 100%);border-bottom:1px solid var(--line);
+}
+.rbhead .rbic{
+  width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:13px;
+  background:var(--accent);color:var(--on-accent);flex:none;
+}
+.rbhead h3{font-size:13.5px;font-weight:700}
+.rbhead .rbsub{font-size:11px;color:var(--sub);margin-left:auto;flex:none}
+/* ★v12：`.rlist` 是「排行榜分榜 + 报告列表」共用的类名 —— 历史上这两处各写了一行同名规则，
+   它们**在合并而不是覆盖**（一行给 flex 布局、一行给卡片外观），所以一直没暴露问题。
+   ⇒ 报告模块移除时**不能把报告段落里的那行一起删掉**，否则排行榜分榜会连带丢掉背景与边框。
+   故把卡片外观**归位**到此处，职责合一。 */
+.rlist{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.rrow{
+  display:flex;align-items:center;gap:11px;padding:8px 14px;cursor:pointer;
+  border-bottom:1px solid var(--divider);transition:.14s;position:relative;
+}
+.rrow:last-child{border-bottom:none}
+.rrow:hover{background:var(--hover)}
+.rno{
+  flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;
+  font-size:11.5px;font-weight:800;color:var(--sub);background:var(--sunken);
+  font-variant-numeric:tabular-nums;
+}
+.rno.g1{background:linear-gradient(160deg,#ffd76e,#f0a92c);color:#5a3a00}
+.rno.g2{background:linear-gradient(160deg,#e3e9f2,#bcc7d8);color:#3b4657}
+.rno.g3{background:linear-gradient(160deg,#f0c8a0,#d59a66);color:#5a3210}
+.rth{
+  /* ★v11：原为硬编码 aspect-ratio:16 / 9，它会**压住** `.cv` 的 var(--th-ar)（见下），
+     导致排行榜 4 个分榜的 48 张图不跟随卡位比例 —— 实测改前/改后都是 43.8%，是本轮
+     唯一「改了没生效」的地方。改为 var(--th-ar) 后随 Tab 一起走。
+     `.rrow` 的高度由内容撑开（只有 padding，无固定 height）⇒ 行高 48.6px → 54.7px（+6.1px）。 */
+  flex:none;width:58px;aspect-ratio:var(--th-ar);border-radius:6px;overflow:hidden;
+  background:var(--imgbg);position:relative;
+}
+.rth img{width:100%;height:100%;object-fit:cover;display:block}
+/* ★ 命名注意：排行榜行名用 .rgname —— 历史上是为了与报告页的 .rname（报告名）区隔；
+   v12 移除报告模块后 .rname 已不存在，此名保持不变（改名无收益，且会牵动断言）。 */
+.rgname{
+  flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;
+}
+.rgname .en{font-weight:500;color:var(--sub);font-size:11.5px}
+/* ★v10：这个 class 原来挂「来源 pill」（v9 因窄列放不下而摘掉），现在改挂
+   **热度口径标签**（TapTap 关注 / 好游快爆预约 / 小七预约…）。
+   存在的理由：手机热游榜是跨源归一化排序，不标口径就看不懂「2.2 万为什么排在 800 万前面」。 */
+.rpill{
+  flex:none;font-size:10.5px;font-weight:650;color:var(--sub);white-space:nowrap;
+  background:var(--sunken);border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+}
+.rval{
+  flex:none;min-width:74px;text-align:right;font-weight:800;color:var(--accent);
+  font-variant-numeric:tabular-nums;white-space:nowrap;font-size:15px;
+}
+.rval .u{font-size:11px;font-weight:700;opacity:.62;margin-left:1px}
+.rval.hm{color:#e0642e}
+.rval.dim{color:var(--sub2);font-size:12.5px;font-weight:600}
+.rbarwrap{flex:none;width:96px;height:6px;border-radius:3px;background:var(--sunken);overflow:hidden}
+.rbarwrap i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--bar-from),var(--accent))}
+
+/* ===== ★v8 首页 + 大图轮播（用户需求⑤）=====
+   轮播条目：左「大图」+ 右「信息」，图片区固定 16 / 10 定比 ⇒ 高度可控、切换不抖。
+   图片一律 cover 满幅（与卡片同一决策），信息区承载名称 / 指标 / 简介 / 按钮。 */
+/* ★v9：Hero 由「单张全宽」改为「1 大 + 2 小」（对齐 TapTap 首页的轮播组合）。
+   左侧 .hmain 沿用原来「大图 + 信息」，右侧 .hside 是两张竖排预览小卡。
+   ⚠️ .hside 用「绝对定位 + opacity」而不是 display:none 切换 ——
+   display:none 的子元素里，浏览器可能**跳过图片加载**，切换时会闪一下空白。 */
+.hero{display:flex;gap:12px;margin-bottom:18px}
+.hmain{
+  position:relative;flex:1;min-width:0;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;overflow:hidden;box-shadow:0 4px 16px var(--sh-hero);
+}
+/* ★v11：272px → 240px。原值下小卡容器比例会随窗口宽度漂移 ——
+   实测 1280 宽时 **2.367**（方图被纵裁 57.8%）、1440 时 1.930、1600 时 1.630、1920 时 1.600。
+   根因：`.hside` 宽度固定、而 `.hmain` 的高度随宽度变化，两者不同步 ⇒ 比例必然漂；
+   再叠加 `.hpic{flex:0 0 52%;max-width:560px}` 在内容宽约 1077px 处的「悬崖」，漂移是非单调的。
+   收窄到 240px 后：漂移带收窄，且 1440 恰好落在 **1.62**（≈16:10，理想值）。
+   （已排除的两条错路：`object-fit:contain` 两侧留 65px 黑边像字幕；
+     一刀切 `object-position` 实测《赛博朋克2077》变好、《生化危机9》反而更差。） */
+.hside{flex:0 0 240px;position:relative;min-height:0}
+.hside-set{
+  position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;
+  opacity:0;pointer-events:none;transition:opacity .25s ease;
+}
+.hside-set.on{opacity:1;pointer-events:auto}
+.hsitem{
+  position:relative;flex:1;min-height:0;border-radius:12px;overflow:hidden;cursor:pointer;
+  border:1px solid var(--line);background:var(--imgbg);transition:.16s;
+}
+.hsitem:hover{border-color:var(--hairline);transform:translateY(-2px)}
+.hsitem img{width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:1}
+.hsitem .ph{position:absolute;inset:0;display:grid;place-items:center;color:var(--ph);font-size:26px}
+.hsitem .ph.gone{display:none}
+.hsitem .cap{
+  position:absolute;left:0;right:0;bottom:0;z-index:2;padding:16px 10px 8px;
+  background:linear-gradient(180deg,rgba(9,14,32,0),rgba(9,14,32,.82));
+  color:#fff;font-size:12.5px;font-weight:700;letter-spacing:.2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.hsitem .cap .bd{
+  display:inline-block;font-size:9.5px;font-weight:700;line-height:14px;padding:0 5px;border-radius:4px;
+  background:var(--accent);color:var(--on-accent);margin-right:5px;vertical-align:1px;
+}
+.hslide{display:none}
+.hslide.on{display:flex}
+.hpic{
+  flex:0 0 52%;max-width:560px;aspect-ratio:16 / 10;position:relative;
+  background:var(--imgbg);overflow:hidden;
+}
+.hpic img{width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:1}
+.hpic .ph{position:absolute;inset:0;display:grid;place-items:center;color:var(--ph);font-size:34px}
+.hpic .ph.gone{display:none}
+.hpic .hsrc{
+  position:absolute;top:10px;left:10px;color:#fff;font-size:11px;font-weight:650;z-index:2;
+  padding:3px 9px;border-radius:6px;background:var(--tag-bg);letter-spacing:.2px;
+}
+.hpic .hsrc.src-xd{background:rgba(11,123,255,.92)}
+.hpic .hsrc.src-jidi{background:rgba(230,65,93,.92)}
+.hpic .hsrc.src-taptap{background:rgba(0,151,167,.92)}
+.hpic .hsrc.src-haoyou{background:rgba(234,88,12,.92)}
+.hpic .hsrc.src-x7{background:rgba(225,29,72,.92)}
+.hinfo{
+  flex:1;min-width:0;padding:20px 22px;display:flex;flex-direction:column;gap:9px;justify-content:center;
+}
+.htagrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.hbadge{
+  font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:2px 8px;border-radius:5px;
+  background:var(--accent);color:var(--on-accent);
+}
+.hbadge.mb{background:#0e9384}
+.hbadge.hot{background:var(--or)}
+.hname{
+  font-size:19px;font-weight:800;line-height:1.32;color:var(--title-strong);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.hname .en{font-size:13px;font-weight:600;color:var(--sub);margin-left:6px}
+.hstat{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.hstat .k{font-size:10.5px;color:var(--sub);display:block;letter-spacing:.3px}
+.hstat .v{font-size:17px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
+.hstat .v.up{color:var(--up)}
+.hstat .v.dim{color:var(--sub2);font-size:14px;font-weight:600}
+.hintro{
+  font-size:12px;color:var(--sub);line-height:1.6;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.hbtns{display:flex;gap:8px;margin-top:2px}
+.hbtns button{
+  font:inherit;font-size:12px;font-weight:700;border-radius:8px;padding:7px 15px;cursor:pointer;
+  border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);transition:.15s;
+}
+.hbtns button:hover{filter:brightness(1.08)}
+.hbtns button.sec{background:var(--raise);color:var(--accent)}
+.hbtns button.sec:hover{background:var(--hover)}
+/*「打开原页」用 <a> 实现（语义正确 + 可中键新窗），外观与 button 保持一致 */
+.hbtns a{
+  font-size:12px;font-weight:700;border-radius:8px;padding:7px 15px;cursor:pointer;
+  border:1px solid var(--accent);background:var(--raise);color:var(--accent);text-decoration:none;
+  display:inline-flex;align-items:center;justify-content:center;transition:.15s;
+}
+.hbtns a:hover{background:var(--hover)}
+/* 轮播控件：右下角「上一张 / 指示点 / 下一张」 */
+.hctrl{
+  position:absolute;right:16px;bottom:14px;display:flex;align-items:center;gap:9px;z-index:3;
+}
+.hctrl button{
+  font:inherit;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);
+  background:var(--raise);color:var(--accent);cursor:pointer;display:grid;place-items:center;
+  font-size:13px;font-weight:700;line-height:1;box-shadow:0 1px 5px var(--sh2);
+}
+.hctrl button:hover{background:var(--hover)}
+.hdots{display:flex;align-items:center;gap:5px}
+.hdots i{
+  width:7px;height:7px;border-radius:50%;background:var(--dotoff);cursor:pointer;
+  transition:.2s;display:block;
+}
+.hdots i.on{background:var(--accent);width:17px;border-radius:4px}
+.hprog{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);width:0;z-index:3}
+/* 首页精选区块 */
+.hsec{margin-bottom:18px}
+.hsechd{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.hsechd .ic{
+  width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;
+  background:var(--hover);color:var(--accent);flex:none;
+}
+.hsechd h3{font-size:14px;font-weight:700}
+.hsechd .sub{font-size:11.5px;color:var(--sub)}
+.hsechd .more{
+  margin-left:auto;font-size:11.5px;color:var(--accent);font-weight:650;cursor:pointer;
+  background:none;border:none;font-family:inherit;padding:3px 8px;border-radius:6px;
+}
+.hsechd .more:hover{background:var(--hover)}
+.hseclist{display:grid;gap:12px}
+/* ★v10：**固定列数**，不再 auto-fill。
+   根因（像素实测，不是推断）：auto-fill + minmax(212px) 在 1424 宽下恰好排成 **5 列**，
+   而每块取 6 张卡 ⇒ 排成 5+1：第二行只有 1 张、右侧一整条空白 —— 这就是首页参差的根因。
+   偏差是**确定性**的（列数由宽度定、卡片数写死 6），不是偶发，换宽度也不会自愈。
+   改成「固定 5 列 + 每块 10 张」后：任何宽度都是 5×2 两行排满，永不出现孤行。 */
+.hseclist.pc{grid-template-columns:repeat(5,minmax(0,1fr))}
+.hseclist.mb{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+
+/* ===== 详情弹窗（★v6：版式对齐 PC 游戏工作台详情抽屉）=====
+   hero 的尺寸**完全由 CSS 决定、不做任何比例判断**：
+     · 宽图：width:100% + height:auto ⇒ 铺满整宽、高度自然展开，**不裁切**
+     · 方图 / 竖图：自然高度会超过 max-height，此时 object-fit:contain 让图**完整显示**，
+       两侧留白由「同图模糊铺底」填满
+   ★ 为什么不再用 onload 读 naturalWidth 判比例（v5 写法）：图片命中浏览器缓存时，
+     onload 可能早于节点入树触发，此时 img.parentElement 为 null ⇒ 读取抛错中断、
+     hero 退回默认 cover，方形图被裁成一条横带（用户截图反馈的「图片被截了」就是这个）。
+     现在把判断从 JS 挪到 CSS，这个时序坑从根上不存在。 */
+.mask{
+  position:fixed;inset:0;background:rgba(12,18,38,.58);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;z-index:90;padding:22px;
+}
+.mask.on{display:flex}
+.dlg{
+  background:var(--card);border-radius:16px;width:min(760px,100%);max-height:88vh;overflow:auto;
+  box-shadow:0 26px 70px rgba(9,16,40,.4);animation:pop .2s ease;position:relative;
+}
+@keyframes pop{from{transform:translateY(12px) scale(.985);opacity:0}to{transform:none;opacity:1}}
+.dtop{
+  position:relative;background:#101A38;overflow:hidden;border-radius:16px 16px 0 0;
+  min-height:240px;display:flex;align-items:center;justify-content:center;
+}
+.dbg{
+  position:absolute;left:-8%;top:-8%;width:116%;height:116%;z-index:0;
+  object-fit:cover;object-position:center;
+  filter:blur(28px) saturate(1.35);opacity:.55;
+}
+.dfg{
+  position:relative;z-index:1;display:block;width:100%;height:auto;
+  max-height:min(50vh,420px);object-fit:contain;
+}
+.phbig{position:relative;z-index:1;display:grid;place-items:center;height:240px;width:100%;color:#8da0c6;font-size:46px}
+.dgrad{
+  position:absolute;left:0;right:0;bottom:0;height:120px;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,rgba(9,14,32,0) 0%,rgba(9,14,32,.5) 46%,rgba(9,14,32,.93) 100%);
+}
+.dhtitle{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:0 18px 14px;color:#fff;pointer-events:none}
+.dhtitle h2{
+  font-size:20px;font-weight:800;line-height:1.34;text-shadow:0 2px 14px rgba(0,0,0,.6);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.dhtitle .hen{
+  font-size:12px;color:rgba(255,255,255,.68);margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.dsrc{
+  position:absolute;top:12px;right:12px;z-index:4;font-size:10.5px;font-weight:750;color:#fff;
+  border-radius:6px;padding:3px 9px;background:var(--dsrc-bg);backdrop-filter:blur(6px);
+}
+/* 来源徽标配色：与卡片左上角 .tag 同一套色系 */
+.dsrc.src-xd{background:rgba(11,123,255,.92)}
+.dsrc.src-jidi{background:rgba(230,65,93,.92)}
+.dsrc.src-steam{background:rgba(23,55,94,.92)}
+.dsrc.src-taptap{background:rgba(0,151,167,.92)}
+.dsrc.src-haoyou{background:rgba(234,88,12,.92)}
+.dsrc.src-x7{background:rgba(225,29,72,.92)}
+.dsrc.src-gamersky{background:rgba(99,102,241,.92)}
+.dsrc.src-gcores{background:rgba(16,185,129,.92)}
+.dsrc.modk{background:rgba(180,83,9,.92)}
+.dclose{
+  position:absolute;top:12px;left:12px;z-index:4;width:32px;height:32px;border-radius:10px;
+  border:1px solid rgba(255,255,255,.22);background:rgba(10,16,36,.55);color:#fff;font-size:14px;
+  cursor:pointer;font-family:inherit;line-height:1;backdrop-filter:blur(6px);
+}
+.dclose:hover{background:rgba(220,38,38,.88)}
+
+.dbody{padding:15px 18px 18px}
+.dnotice{
+  display:flex;gap:8px;align-items:flex-start;background:var(--note-bg);border:1px solid var(--note-line);color:var(--note-tx);
+  border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.62;margin-bottom:14px;
+}
+.dnotice b{color:var(--note-tx-b)}
+.dnotice code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:11.5px}
+/* 大号数字行（对齐工作台 .score-line） */
+.sline{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:13px}
+.sbig{
+  font-size:27px;font-weight:800;color:var(--accent);background:var(--raise);border:1px solid var(--line);
+  border-radius:11px;padding:1px 15px;line-height:1.32;box-shadow:0 2px 8px var(--sh2);
+  font-variant-numeric:tabular-nums;
+}
+.sbig.hm{color:var(--or)}
+.sbig.dim{color:var(--sub2);font-size:22px}
+.sbig.sm{font-size:20px;padding:4px 15px;letter-spacing:0}
+.sbig .u{font-size:13px;font-weight:700;opacity:.62;margin-left:4px}
+.smeta{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub);line-height:1.34}
+.smeta i{font-style:normal;align-self:flex-start;font-size:10.5px;font-weight:750;color:var(--info-tx);
+  background:var(--info-chip);border-radius:5px;padding:1.5px 8px}
+.smeta i.wn{color:var(--warn);background:var(--warn-chip)}
+.smeta i.gn{color:var(--gn-tx);background:var(--gn-chip)}
+/* KV 卡片网格（对齐工作台 .kv：浅灰底小卡，恒 3 列） */
+.dkv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.dkv .it{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:7px 10px;min-width:0}
+.dkv .k{font-size:10.5px;color:var(--sub);letter-spacing:.2px}
+.dkv .v{font-size:12.5px;font-weight:650;margin-top:2px;line-height:1.4;word-break:break-word}
+/* 分区块 */
+.dblock{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:12px}
+.dblock h4{font-size:12.5px;font-weight:750;display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.dblock h4 .ic{width:6px;height:6px;border-radius:2px;background:var(--accent);flex:none}
+.dblock h4 .cnt{margin-left:auto;font-size:11px;color:var(--sub);font-weight:600}
+.dblock p{
+  font-size:12.5px;color:var(--sub);line-height:1.8;white-space:pre-line;
+  word-break:break-word;max-height:186px;overflow:auto;
+}
+.dtags{display:flex;gap:6px;flex-wrap:wrap}
+.dlinks{display:flex;gap:8px;flex-wrap:wrap}
+.dlinks a{
+  font-size:12px;text-decoration:none;padding:6px 13px;border-radius:8px;background:var(--accent);
+  color:var(--on-accent);font-weight:700;transition:.15s;
+}
+.dlinks a:hover{background:var(--accent-h)}
+.dlinks a.sec{background:var(--raise);color:var(--accent);border:1px solid var(--accent)}
+.dlinks a.sec:hover{background:var(--hover)}
+.dfoot{font-size:11.5px;color:var(--sub);line-height:1.72;padding-top:10px;border-top:1px dashed var(--line)}
+
+.empty{padding:60px 20px;text-align:center;color:var(--sub)}
+.empty .big{font-size:34px;margin-bottom:10px;opacity:.5}
+.foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--sub);line-height:1.8}
+.foot code{background:var(--bg);border:1px solid var(--line);padding:1px 5px;border-radius:4px;font-size:11px}
+
+/* ===== ★v13 响应式：3 档断点（NEXT P0-3，此前全表 @media 数量 = 0）==========
+   背景：v8~v12 的外观只在 **1424 宽（默认窗口）** 下被实拍验证过；窗口一窄，
+   200px 定宽侧栏 + 5 列定宽网格只能硬扛，卡片被挤到 190px 以下。
+
+   ★ 三条自我约束（踩过的坑都在这里）：
+     ① **所有断点都取在 1424 以下** —— 默认窗口 1424×861 必须与 v12 逐像素一致，
+        否则本轮实拍与 jsdom 基线不可比。故最宽的一档是 1200。
+     ② **列数只走「能整除卡片数」的分流**：PC 精选块 10 张、手游精选块 6 张，
+        收窄时只切到 2 列 / 1 列 ⇒ 任何宽度下都是整行排满，
+        v10 定下的「不留孤行」不变式继续成立（不要改成 auto-fill，就是它会排成 5+1）。
+     ③ **只覆盖，不动基础规则** —— `.hseclist.pc{...repeat(5...)}` / `.hseclist.mb{...repeat(3...)}`
+        两行原样保留，故 _t_demo.js 里那 4 条「固定列数」断言仍然命中，无需改动。 */
+
+/* ---- 档 1：≤1200px（窄窗 / 左右分屏）---- */
+@media (max-width:1200px){
+  .nav{width:168px;flex:0 0 168px}
+  .hside{flex:0 0 208px}
+  .hseclist.pc{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hseclist.mb{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .main{padding:14px 16px 28px}
+}
+
+/* ---- 档 2：≤1040px ---- */
+@media (max-width:1040px){
+  .nav{width:150px;flex:0 0 150px}
+  .search{min-width:150px}
+}
+
+/* ---- 档 3：≤920px（打包窗口最小 900×600，这一档同时兜住「浏览器里直接打开」的情形）---- */
+@media (max-width:920px){
+  /* 首页 hero 由「左大图 + 右小卡」改为上下叠放 —— 窄窗下 240px 定宽小卡会把主图压没 */
+  .hero{flex-direction:column}
+  .hside{flex:none;height:154px}
+  .hside-set{flex-direction:row}
+  .hpic{flex:0 0 46%;max-width:420px}
+  .hinfo{padding:16px}
+  .rankboards{grid-template-columns:minmax(0,1fr)}
+  .hseclist.mb{grid-template-columns:minmax(0,1fr)}
+  .dkv{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ★v12：原「端游报告」样式段落（.rstats / .rstat / .ritem / .rhead / .rarrow / .rname /
+   .rmeta / .rbody / .kd）已随报告模块一并移除。
+   ⚠️ 唯一的例外是 `.rlist` 的卡片外观：它曾在本段定义，却被排行榜分榜共用，
+   整段删除会让排行榜掉背景 —— 已上移到排行榜段落（见 `.rlist`），此处不再保留。 */
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="logo"><span class="dot"></span>游戏情报客户端</div>
+    <span class="ver">v0.1.0-demo</span>
+    <div class="spacer"></div>
+    <div class="svc"><i></i><span>数据快照 · <b id="builtAt">--</b></span></div>
+    <button class="btn ghost" onclick="alert('Demo 阶段：更新链路尚未实现。\n\n正式版：\n· exe → 静默升级（sha256 + 包签名校验）\n· APK → 仅能下载后引导你点确认安装\n  （Android 不允许第三方应用静默自装）')">检查更新</button>
+    <button class="btn ghost" id="themeBtn" title="切换深色 / 浅色主题">🌙 夜间</button>
+  </div>
+
+  <div class="body">
+    <nav class="nav">
+      <a href="#" class="on" data-tab="home"><span class="ico">🏠</span>首页</a>
+      <h4>PC 端游</h4>
+      <a href="#" data-tab="pcNew"><span class="ico">🎮</span>新游<span class="cnt" id="c-pcNew">-</span></a>
+      <a href="#" data-tab="pcHot"><span class="ico">🔥</span>热游<span class="cnt" id="c-pcHot">-</span></a>
+      <a href="#" data-tab="pcRank"><span class="ico">🏆</span>排行榜<span class="cnt" id="c-pcRank">-</span></a>
+      <a href="#" data-tab="pcTrainer"><span class="ico">🛠️</span>修改器<span class="cnt" id="c-pcTrainer">-</span></a>
+      <a href="#" data-tab="pcMod"><span class="ico">🧩</span>MOD<span class="cnt" id="c-pcMod">-</span></a>
+      <div class="grp">
+        <h4>手游</h4>
+        <a href="#" data-tab="mNew"><span class="ico">📱</span>新游<span class="cnt" id="c-mNew">-</span></a>
+        <a href="#" data-tab="mEvent"><span class="ico">🎉</span>活动<span class="cnt" id="c-mEvent">-</span></a>
+        <a href="#" data-tab="mPlay"><span class="ico">🕹️</span>可玩端游<span class="cnt" id="c-mPlay">-</span></a>
+      </div>
+    </nav>
+
+    <main class="main" id="main"></main>
+  </div>
+</div>
+
+<!-- ★ 详情弹窗：全站卡片点击统一走这里 -->
+<div class="mask" id="mask" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="dlg" id="dlg"></div>
+</div>
+
+<script src="data.js"></script>
+<script>
+/* ★v13：原为 const，因新增「在线数据更新」需整体替换数据源（`D = 新快照`）而改为 let。
+   全站读取方一律不动 —— 仍是 `D.xxx` / `T.xxx`。 */
+let D = window.__DEMO_DATA__ || {};
+let T = D.totals || {};
+document.getElementById('builtAt').textContent = (D.meta&&D.meta.builtAt)||'--';
+
+/* ===== ★v9 主题切换 =====
+   首帧的 data-theme 已由 <head> 里的同步脚本定好（防闪），这里只做两件事：
+     ① 把按钮文案对齐当前主题  ② 点按钮 → 切换 + 写入 localStorage。
+   注意：切换只改 <html data-theme>，不重建 DOM —— CSS 变量会自动重算，
+   所以不会丢当前 Tab、筛选条件或滚动位置。 */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  const b = document.getElementById('themeBtn');
+  if(b) b.textContent = (t === 'dark') ? '☀️ 日间' : '🌙 夜间';
+  try{ localStorage.setItem('gi-theme', t); }catch(e){}
+}
+(function(){
+  const b = document.getElementById('themeBtn');
+  if(b) b.addEventListener('click', function(){
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+})();
+
+const TABS = {
+  home:     {t:'首页',      kind:'home'},   /* ★v8 新增：轮播 + 三块精选（用户需求⑤） */
+  pcNew:    {t:'PC 新游',   kind:'pc'},
+  pcHot:    {t:'PC 热游',   kind:'pc'},
+  /* ★v8：排行榜改为「列表 + 分榜」——rankBoard 标记走独立渲染分支（用户需求②）
+     ★v10：分榜改为 4 个（PC新游/PC热游/手机新游/手机热游），且该分支不再挂搜索与筛选 */
+  pcRank:   {t:'排行榜', kind:'pc', rank:true, rankBoard:true},
+  pcTrainer:{t:'PC 修改器', kind:'pc'},
+  pcMod:    {t:'PC MOD',    kind:'pc'},
+  mNew:     {t:'手游新游',  kind:'mb'},
+  mEvent:   {t:'手游活动',  kind:'mb'},
+  mPlay:    {t:'手游可玩端游', kind:'pc'},   /* ★ 与 PC 端游同一套卡片骨架 + 同一套网格 */
+  /* ★v12：移除 `report`（端游可视报告）—— 用户 2026-10-15 要求先拿掉报告模块。
+     data.js 里的 `report` 键保留不动（无引用即不渲染），重跑构建脚本即可恢复。 */
+};
+
+/* ---------------- 排序 / 筛选定义（结构参考 PC 游戏工作台） ---------------- */
+const gv = (x,k)=> x[k]===undefined||x[k]===null? -1 : x[k];
+const SORTS = {
+  pcNew:  [ {k:'ts',nm:'最新上架',lb:'NEW'}, {k:'score',nm:'评分最高',lb:'SCORE'}, {k:'size',nm:'容量最大',lb:'SIZE'}, {k:'hot',nm:'热度最高',lb:'HOT'}, {k:'name',nm:'名称',lb:'A-Z'} ],
+  pcHot:  [ {k:'hot',nm:'热度最高',lb:'HOT'}, {k:'score',nm:'评分最高',lb:'SCORE'}, {k:'ts',nm:'最新上架',lb:'NEW'}, {k:'name',nm:'名称',lb:'A-Z'} ],
+  /* pcRank 不在这里 —— 排行榜由「分榜」自带排序，见 RANK_BOARDS */
+  pcTrainer:[ {k:'version',nm:'版本最新',lb:'VER'}, {k:'name',nm:'名称',lb:'A-Z'} ],
+  pcMod:  [ {k:'pv',nm:'浏览最多',lb:'PV'}, {k:'name',nm:'名称',lb:'A-Z'} ],
+  mNew:   [ {k:'ts',nm:'资讯最新',lb:'NEW'}, {k:'launch',nm:'上线时间',lb:'DATE'},
+            {k:'hot',nm:'热度最高',lb:'HOT'}, {k:'score',nm:'评分最高',lb:'SCORE'}, {k:'name',nm:'名称',lb:'A-Z'} ],
+  mEvent: [ {k:'ts',nm:'最新',lb:'NEW'}, {k:'cat',nm:'按类目',lb:'CAT'}, {k:'name',nm:'名称',lb:'A-Z'} ],
+  mPlay:  [ {k:'configs',nm:'配置最多',lb:'CFG'}, {k:'fps',nm:'帧数',lb:'FPS'}, {k:'name',nm:'名称',lb:'A-Z'} ],
+};
+const CMP = {
+  ts:(a,b)=> String(gv(b,'ts')).localeCompare(String(gv(a,'ts'))),
+  score:(a,b)=> (gv(b,'scoreV'))-(gv(a,'scoreV')),
+  size:(a,b)=> (gv(b,'sizeGB'))-(gv(a,'sizeGB')),
+  launch:(a,b)=> (gv(b,'launchTs'))-(gv(a,'launchTs')),
+  hot:(a,b)=> ((gv(b,'hotV')>=0?gv(b,'hotV'):gv(b,'hot')))-((gv(a,'hotV')>=0?gv(a,'hotV'):gv(a,'hot'))),
+  pv:(a,b)=> (gv(b,'pv'))-(gv(a,'pv')),
+  configs:(a,b)=> (gv(b,'configs'))-(gv(a,'configs')),
+  version:(a,b)=> String(gv(b,'version')).localeCompare(String(gv(a,'version'))),
+  fps:(a,b)=> String(gv(b,'fps')).localeCompare(String(gv(a,'fps'))),
+  cat:(a,b)=> String(gv(a,'cat')).localeCompare(String(gv(b,'cat'))),
+  name:(a,b)=> String(gv(a,'title')||gv(a,'game')).localeCompare(String(gv(b,'title')||gv(b,'game')),'zh'),
+};
+
+/* 筛选组：field 取值 / opts 值 → 展示名 */
+const FILTERS = {
+  pcNew:  [ {k:'srcKey',lb:'来源',field:'srcKey',opts:[['xd','XD'],['jidi','机地']]},
+            {k:'genre', lb:'品类',field:'genre',top:9} ],
+  pcHot:  [ {k:'srcKey',lb:'来源',field:'srcKey',opts:[['xd','XD'],['jidi','机地']]},
+            {k:'genre', lb:'品类',field:'genre',top:9} ],
+  /* ★v10：pcRank 不再是「筛选页」—— 它由 4 个分榜自带数据池，
+     筛选组与排序按钮在上面那支渲染分支里被整体绕过了，这里留着只会误导。 */
+  pcTrainer:[ {k:'srcKey',lb:'来源',field:'srcKey',auto:true} ],
+  /* ★v10：pcMod 的「类型」筛选组**整组删除**（不再是死选项，是根本不该有）。
+     原因（实测）：原选项是 [MOD / 修改器]，但本 Tab 的池子只取 MOD ——
+     全库 8,943 条里修改器最高 pv 仅 3,409，**进不了 Top60**，所以「修改器」按钮
+     点一下必然是「没有匹配结果」。而且「修改器」本来就有独立 Tab（pcTrainer，
+     来源 trainers.json），同页再放一个永远筛出空集的按钮是纯误导。 */
+  pcMod:  [],
+  mNew:   [ {k:'srcKeys',lb:'来源',field:'srcKeys',
+             opts:[['taptap','TapTap'],['haoyou','好游快爆'],['x7','小七']]},
+            {k:'cat',lb:'类目',field:'cat',auto:true} ],
+  mEvent: [ {k:'cat',lb:'类目',field:'cat',opts:[['联动活动','联动'],['版本更新','版本更新'],['活动','活动']]},
+            {k:'srcKey',lb:'来源',field:'srcKey',auto:true} ],
+  mPlay:  [ {k:'tierKey',lb:'档位',field:'tierKey',opts:[['ok','可玩'],['pending','待测']]} ],
+};
+
+/* ---------------- 状态 ---------------- */
+/* ★v8：默认落地页改为首页（轮播 + 精选） */
+let cur='home', kw='', sortK=null;
+let curList = [];       // ★ 当前渲染出的列表（弹窗按序号取数据，保证与屏幕所见一致）
+let fx = {};            // {组key: Set(值)}
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function resetState(tab){
+  cur=tab; kw=''; fx={};
+  const s=SORTS[tab]; sortK = s? s[0].k : null;
+}
+function fxHas(group, val){
+  const s=fx[group]; return !s || s.size===0 || s.has(val);
+}
+function fxToggle(group, val){
+  const s=fx[group] || (fx[group]=new Set());
+  if(s.has(val)) s.delete(val); else s.add(val);
+}
+
+/* ---------------- 图片：容器定比 ＋ 一律 cover 铺满（★v7） ---------------- */
+/* ★v8：去掉 loading="lazy"。
+   原因（实测）：无头 Chrome 在 `--virtual-time-budget` 下不产生正常渲染帧，
+   **懒加载图几乎不会触发加载** —— `--dump-dom` 导出显示 mEvent 98 张图
+   `complete=false / naturalWidth=0`、截图里整片空白，而同一批 URL 用纯 HTTP 请求
+   全是 200（1080×608）。这会让「视觉验收」这个 v7 才建立起来的能力整体失真，
+   代价远大于省下的带宽；单 Tab 最多 153 张图，直接全量加载。
+   （若将来数据量级放大，再换成 IntersectionObserver 自管懒加载，别退回原生 lazy。） */
+function cover(src, cls, tagHtml, badgeHtml){
+  const ph = `<div class="ph">🎮</div>`;
+  const t = tagHtml||'', b = badgeHtml||'';
+  if(!src) return `<div class="cv ${cls}">${ph}${t}${b}</div>`;
+  return `<div class="cv ${cls}">${ph}
+    <img decoding="async" referrerpolicy="no-referrer" src="${esc(src)}" alt=""
+      onload="reveal(this)" onerror="this.remove()">${t}${b}</div>`;
+}
+/* 图片就位：藏掉占位 + 打 .ready 标记。**不做任何比例判断**（填充方式由 CSS 的 object-fit 定死）。
+   ★v8 语义变更：这已是**纯优化**动作 —— 图的可见性由 CSS（`img{z-index:1}` 压在占位 `.ph` 之上）
+   决定，即使本函数因「缓存命中、load 早于入树」而没跑到，图也照样看得见。
+   这正是修掉「图加载完了却一直透明」的关键：**别让可见性依赖回调**。
+   ★ 空值防御必需：缓存命中时 onload 可能早于节点入树触发，那时 previousElementSibling
+     为 null；若在读取处直接抛错，整段逻辑会静默中断（v5 的坑，见 SOP §1.2.2）。 */
+function reveal(img){
+  const ph = img.previousElementSibling;
+  if(ph && ph.classList && ph.classList.contains('ph')) ph.classList.add('gone');
+  img.classList.add('ready');
+}
+/* 渲染后补跑一遍：浏览器对「已在缓存里的图」可能不派发 load，或在节点还没挂到
+   文档树上时就派发 —— 两种情况都会漏掉 reveal，症状是「图不出现 / 占位不消失」。
+   对已 complete 且还没标记 ready 的图主动补跑，把偶发变成必然。 */
+function syncImgs(root){
+  const scope = root || document;
+  scope.querySelectorAll('.cv img, .mth img, .hpic img, .hsitem img').forEach(im=>{
+    if(!im.complete || !im.naturalWidth) return;
+    reveal(im);
+  });
+}
+/* ★v8 标题拆分（用户需求①：中文名 + 英文名用（）包含）
+   库里 title 是「中文名/英文名/中文别名」的自由拼接（实测样本）：
+     `007 初露锋芒/007 First Light`
+     `侠盗猎车手5传承版/GTA5传承版/Grand Theft Auto V Legacy`
+     `极限竞速：地平线5/Forza Horizon 5/支持网络联机`
+     `【mod】极致细致的果/体+动态x器官`     ← 这里的 `/` 不是分隔符！
+   规则（**只按「段是否含 CJK」分类，不做词义猜测**）：
+     · 含 CJK 的段 → 按原序用「 / 」连成主名
+     · 不含 CJK 的段 → 合并进括号（多个英文名用「 / 」连）
+   两条护栏（防误拆，是这套规则的关键）：
+     ① 一个纯英文段都没有 ⇒ **整体不动**（否则 `红色警戒2/红警2` 会被拆坏）；
+     ② 全是英文段（主名为空）⇒ 也**整体不动**（否则会输出 `AAA/BBB（AAA / BBB）` 这种重复）。
+   返回 {main, en, changed}。 */
+function nameParts(t){
+  const s = String(t||'').trim();
+  if(s.indexOf('/') < 0) return {main:s, en:'', changed:false};
+  const segs = s.split('/').map(x=>x.trim()).filter(Boolean);
+  if(segs.length < 2) return {main:s, en:'', changed:false};
+  const CJK = /[\u4e00-\u9fff]/;
+  const zh = segs.filter(x=>CJK.test(x));
+  const en = segs.filter(x=>!CJK.test(x));
+  if(!en.length || !zh.length) return {main:s, en:'', changed:false};
+  return {main:zh.join(' / '), en:en.join(' / '), changed:true};
+}
+/* 卡片标题 HTML：中文名 +（英文名）。英文名小半号、灰度降一档（样式见 .ctitle .en） */
+function titleHTML(t){
+  const p = nameParts(t);
+  if(!p.changed) return esc(p.main);
+  return `${esc(p.main)}<span class="en">（${esc(p.en)}）</span>`;
+}
+
+/* ---------------- 卡片：统一骨架 ---------------- */
+/* ★ 统一原则：PC 端游 5 个 Tab（新游/热游/排行/修改器/MOD）+ 手游「可玩端游」
+   全部走同一个 cardShell()，因此外框 / 缩略图比例 / 行距 / 行高完全一致。 */
+/* 标签配色：游戏两源 + 资讯四源 + 修改器五源（保证每个 Tab 的左上标签都有色，不缺档） */
+const SRC_CLS = {xd:'src-xd',jidi:'src-jidi',steam:'src-steam',
+                 taptap:'src-taptap',haoyou:'src-haoyou',x7:'src-x7',
+                 gamersky:'src-gamersky',gcores:'src-gcores',
+                 cheat_table:'src-ce',fling:'src-fling',community:'src-community',
+                 xiaoxing:'src-xiaoxing',gcm:'src-gcm'};
+
+const fmtHot = n => {
+  const v = Number(n)||0;
+  if(v >= 10000) return (v/10000).toFixed(v>=100000?0:1)+'万';
+  return String(v);
+};
+/* 帧数原文本太长（如「帧数不显示，轻微卡顿」）→ 角标只取可量化的那一段 */
+function fpsShort(s){
+  const t = String(s||'');
+  const m = t.match(/(\d+)\s*[-~—至]\s*(\d+)/); if(m) return m[1]+'-'+m[2];
+  const m2 = t.match(/(\d+)\s*帧/);             if(m2) return m2[1]+' 帧';
+  return '';
+}
+/* 《游戏名》xx活动 → 去掉开头的《游戏名》，只留「活动标题」 */
+function subOf(a){
+  const t = String(a.title||''), g = String(a.game||'');
+  if(!g) return t;
+  const pre = '《'+g+'》';
+  if(t.startsWith(pre)){
+    const rest = t.slice(pre.length).replace(/^[\s·，,、:：\-—]+/,'');
+    return rest || t;
+  }
+  return t;
+}
+
+/**
+ * 统一卡片骨架（自上而下四段，高度全部固定）：
+ *   ① 缩略图（16:9 定比）  ② 标题（正文两行预留）  ③ 元信息行（一行）  ④ 底栏（一行，贴底对齐）
+ * 字段由各 Tab 按同一顺序填入 ⇒ 6 个 Tab 的卡片外形完全一致。
+ */
+const srcTag = a => ({cls:SRC_CLS[a.srcKey]||'', text:a.src});
+
+/* ★v5：卡片不再 onclick 直接跳走，改成携带 (tab, 序号) → openDetail() 弹窗
+   弹窗里再给「打开原页」按钮，避免误点就跑掉
+   ★v8：o.titleHtml 供「中文名 +（英文名）」这种带标记的标题用；o.tab 供首页跨 Tab 卡片用 */
+function cardShell(o){
+  const tag   = o.tag   ? `<span class="tag ${o.tag.cls||''}">${esc(o.tag.text)}</span>` : '';
+  const badge = o.badge ? `<span class="badge-tr ${o.badgeCls||''}">${esc(o.badge)}</span>` : '';
+  const rank  = o.rank!=null ? `<span class="rankno">NO.${o.rank}</span>` : '';
+  return `<div class="card ${o.cls||''}" data-d="${o.tab||cur}" data-i="${o.idx}" title="${esc(o.tip||o.title||'')}">
+    ${cover(o.img,'',tag,badge+rank)}
+    <div class="cbody">
+      <div class="ctitle">${o.titleHtml || esc(o.title)}</div>
+      <div class="cmeta">${o.meta||''}</div>
+      <div class="crow bottom">${o.bottom||''}</div>
+    </div></div>`;
+}
+
+function cardPC(a,i,showRank,tab){
+  return cardShell({
+    idx:i, tab, title:a.title, titleHtml:titleHTML(a.title), tip:a.title, img:a.cover,
+    tag:srcTag(a), badge:a.score, rank:showRank? i+1 : null,
+    meta:`<span class="pill">${esc(a.genre||'—')}</span>` +
+         (a.hot?`<span class="pill hot">热度 ${fmtHot(a.hot)}</span>`:''),
+    bottom:(a.size?`<span class="pill">${esc(a.size)}</span>`:'')+`<span>${esc(a.date||'—')}</span>`,
+  });
+}
+function cardTrainer(a,i,tab){
+  return cardShell({
+    idx:i, tab, title:a.title, titleHtml:titleHTML(a.title), tip:`${a.title} / ${a.en}`, img:a.cover,
+    tag:srcTag(a), badge:a.version,
+    meta:`<span class="pill">${esc(a.en||'—')}</span>`,
+    bottom:a.steamId?`<span class="pill">Steam ${esc(a.steamId)}</span>`:`<span>修改器</span>`,
+  });
+}
+function cardMod(a,i,tab){
+  return cardShell({
+    idx:i, tab, title:a.title, titleHtml:titleHTML(a.title), tip:a.title, img:a.cover,
+    /* ★v10：左上角改挂**来源**，与其它 Tab 一致（每个 Tab 的 tag 都是来源）。
+       原实现挂的是 a.kind='MOD' —— 那是**类型**不是来源，导致 60 张卡长得一模一样、
+       页面上完全看不出数据取自哪里（用户问「获取源是哪些」正是问这个）。
+       本 Tab 单一来源 = 机地，数据层已写入 src/srcKey。 */
+    tag: srcTag(a), badge:a.pv?`👁 ${fmtHot(a.pv)}`:'',
+    meta:`<span class="pill">${esc(a.game||'—')}</span>`,
+    bottom:`<span class="ell">@${esc(a.author||'匿名')}</span>` +
+           (a.nlink>0?`<span class="pill ok">${a.nlink} 链接</span>`:''),
+  });
+}
+/* 可玩端游：与 PC 端游同一骨架，只把「来源」换成「可玩档位」、字段换成模拟器维度的实测值 */
+function cardPlay(a,i,tab){
+  return cardShell({
+    idx:i, tab, title:a.title, titleHtml:titleHTML(a.title), tip:`${a.title}｜${a.tier||''} · ${a.fps||''}`, img:a.cover,
+    tag:{cls:a.tierKey==='ok'?'tier':'tier gray', text:a.tier||'待测'},
+    badge:fpsShort(a.fps),
+    meta:`<span class="pill ok">配置 ${a.configs} 套</span>` +
+         (a.devices?`<span class="pill">${a.devices} 台实测</span>`:''),
+    bottom:(a.chip?`<span class="pill">${esc(a.chip)}</span>`:'') +
+           `<span class="ell">${esc(a.fps||'—')}</span>`,
+  });
+}
+
+/* ---------------- 手游横向卡（新游 / 活动） ---------------- */
+function mThumb(src, cls, emoji){
+  return `<div class="mth ${cls}"><div class="ph">${emoji}</div>
+    <img decoding="async" referrerpolicy="no-referrer" src="${esc(src)}" alt=""
+      onload="reveal(this)" onerror="this.remove()"></div>`;
+}
+const fmtScore = v => (Number(v)||0).toFixed(1);
+
+/* ★v6 手游新游卡（对齐参考图 + 右侧全兜底）
+   ① 右侧大号数字**定宽 76px 右对齐**：评分(绿★) > 热度(橙🔥) > 占位「—」
+      —— 那两条「上游无评分无热度」的记录来自好游快爆独家（无 engagement 字段），
+         用「—」占位而不是留空，保证 153 张卡的右列位置完全一致
+   ② 游戏名 / 标签行 / 时效行各自单行省略 ⇒ 名称长短、标签个数都不改变卡片高度
+   ★v8 两处调整（用户需求③）：
+     · **时间只出现一次** —— 标题行后缀只保留状态词（定档 / 预约中 / 已上线），
+       不再拼 `定档 10/9`；日期统一由标签下的绿色时效行承载。
+     · **平台标签移到卡片右上角**（`.mtop`），不再混在标签行里；最多显示 2 个，
+       其余折叠成 `+N`，标签再多也不改变卡片高度与正文宽度。 */
+function cardMNew(a,i,tab){
+  const hasScore = Number(a.score) > 0;
+  let right;
+  if(hasScore){
+    right = `<div class="mscore" title="评分"><span class="ic">★</span><span class="v">${esc(fmtScore(a.score))}</span></div>`;
+  }else if(a.hot){
+    right = `<div class="mscore hm" title="${esc(a.hotLabel||'热度')}"><span class="ic">🔥</span><span class="v">${esc(fmtHot(a.hot))}</span></div>`;
+  }else{
+    right = `<div class="mscore none" title="上游暂无评分 / 热度数据">—</div>`;
+  }
+  /* 平台标签 → 右上角；超出上限折叠为 +N */
+  const plats = (a.sources && a.sources.length)
+    ? a.sources.map(s=>`<span class="pill ${SRC_CLS[s.key]||''}">${esc(s.src)}</span>`)
+    : (a.src ? [`<span class="pill ${SRC_CLS[a.srcKey]||''}">${esc(a.src)}</span>`] : []);
+  const MAXP = 2;
+  const kept = plats.slice(0, MAXP), extra = plats.length - kept.length;
+  const top = plats.length
+    ? `<div class="mtop">${kept.join('')}${
+        extra > 0 ? `<span class="pill more" title="${esc(plats.length + ' 个来源')}">+${extra}</span>` : ''
+      }</div>`
+    : '';
+  /* 上游标签偶发被整条过滤掉（好游快爆推荐位污染），此时回落到类目，保证标签行不空 */
+  const tlist = (a.tags && a.tags.length) ? a.tags.slice(0,3) : [a.cat||'手游'];
+  const tags = tlist.map(t=>`<span class="pill">${esc(t)}</span>`).join('');
+  const st = String(a.status||'').trim();          /* ★v8：只用状态词，不带日期 */
+  const pre = st && st !== '已上线';
+  return `<div class="mcard nw" data-d="${tab||cur}" data-i="${i}" title="${esc(a.game)}">
+    ${top}
+    ${mThumb(a.img,'sq','📱')}
+    <div class="mbd">
+      <div class="mrow">
+        <span class="mt">${esc(a.game)}</span>
+        ${st?`<span class="mst${pre?' pre':''}">${esc(st)}</span>`:''}
+        ${hasScore && a.hot ? `<span class="mhot" title="${esc(a.hotLabel)}">🔥${esc(fmtHot(a.hot))}</span>` : ''}
+      </div>
+      <div class="mtags">${tags}</div>
+      <div class="msub gn" title="${esc(a.note)}">${esc(a.note||a.launchText||'')}</div>
+    </div>
+    ${right}</div>`;
+}
+/* 手游活动（★v8：用户需求④补「上线/开始时间」）
+   · 类目从标题行移到右上角（与新游卡的平台标签同一位置，两类卡视觉对齐）
+   · 时间放游戏名右侧，绿色定宽 —— 卡上不再有重复的时间字段 */
+function cardMEvent(a,i,tab){
+  const t = a.launchText || a.dateText || a.tlDate || '';
+  const cat = a.cat ? `<div class="mtop"><span class="pill">${esc(a.cat)}</span></div>` : '';
+  return `<div class="mcard" data-d="${tab||cur}" data-i="${i}" title="${esc(a.title)}">
+    ${cat}
+    ${mThumb(a.img,'wd','🎉')}
+    <div class="mbd">
+      <div class="mtl">
+        <div class="mt">${esc(a.game||a.title)}</div>
+        ${t?`<span class="mtime" title="上线 / 开始时间">${esc(t)}</span>`:''}
+      </div>
+      <div class="msub">${esc(subOf(a))}</div>
+    </div></div>`;
+}
+function go(u){ if(u) location.href=u; }
+
+/* ---------------- 缺口 / 说明 ---------------- */
+function noticeFor(k){
+  if(k==='pcRank'){
+    return `<div class="notice info"><b>★v10 排行榜口径</b>：本页只摆 <b>4 个分榜</b> ——
+      <b>PC 新游榜 / PC 热游榜 / 手机新游榜 / 手机热游榜</b>，每榜固定排序、各取 Top 12。<br>
+      每榜的数据池就是对应 Tab 的池子（<code>pcNew</code> / <code>pcHot</code> / <code>mNew</code>），
+      所以<b>点榜上行 = 点那个 Tab 里的同一条</b>，弹窗取数不会错位。<br>
+      <b>本页不设搜索与筛选</b>：四个榜跨 3 个 Tab、来源口径也不一致（PC 是 XD / 机地，
+      手游是 TapTap / 好游快爆 / 小七），一套筛选器套上去必然有榜被筛空。<br>
+      <b>手机热游榜为什么要归一化</b>：实测 <code>mNew</code> 的 <code>hot</code> 跨源<b>差 3 个数量级</b>
+      （TapTap 关注最高 822 万 / 好游预约 143 万 / 小七预约 2.2 万），直接混排会变成「TapTap 关注榜」。
+      故先按<b>源内百分位</b>换算再混排，并在行内标注原始口径；<b>原始数值照常展示，不篡改</b>。<br>
+      <b>PC 口径</b>：<code>games.json</code> 共 19,239 条（<code>xdgamer</code> + <code>jidi</code> 两源），
+      <b>不含 Steam 商店源</b>；无对应字段的记录不进该榜（不造数）。</div>`;
+  }
+  if(k==='pcNew'||k==='pcHot'){
+    return `<div class="notice"><b>数据口径</b>：本机 game-aggregator 现有 <code>xdgamer</code> + <code>jidi</code> 两源游戏库
+      （<code>games.json</code> 共 19,239 条），<b>不含 Steam 商店源</b>。故本 Tab 为「跨平台入库游戏」视角，非纯 Steam。
+      真正的 Steam 新游/热游/排行需新建抓取链（方案 M1–M3）。</div>`;
+  }
+  if(k==='pcTrainer'){
+    return `<div class="notice"><b>来源说明</b>：<code>trainers.json</code> 共 <b>${(T.trainer||0).toLocaleString()}</b> 条
+      （有封面 ${(T.trainerCover||0).toLocaleString()} 条），5 个来源。Demo <b>按来源均衡取样</b>（各来源轮流取，组内按版本号倒序），
+      避免单一来源淹没其它来源。</div>`;
+  }
+  if(k==='pcMod'){
+    const bk = T.modByKind || {}, mm = T.modMatched || {};
+    return `<div class="notice"><b>来源说明</b>：<code>mods.json</code> 共 <b>${(T.mod||0).toLocaleString()}</b> 条，
+      <b>单一来源 = 机地</b>（<code>jidiyouxi.com/modify/list</code> 的 MOD / 修改器社区帖，
+      由 <code>tools/fetch-mods.js</code> + <code>fetchers/jidiModify.js</code> 采集，非本 demo 抓取）。<br>
+      构成：<b>MOD ${(bk.mod||0).toLocaleString()}</b> + 修改器 <b>${(bk.modifier||0).toLocaleString()}</b>；
+      <b>本 Tab 只取 MOD</b>（修改器走侧栏「修改器」Tab），按浏览量降序 Top 60。<br>
+      其中 <b>${(mm.matched||0).toLocaleString()} 条（${mm.rate||0}%）</b>已匹配到端游库条目
+      （<b>${(mm.xd||0).toLocaleString()} 条 → XD</b> / ${mm.jidi||0} 条 → 机地），弹窗据此给出「游戏页」链接。<br>
+      「N 链接」= 该帖附带网盘 / 下载链接条数（仅展示，不跳网盘）。</div>`;
+  }
+  if(k==='mNew'){
+    const s=D.mStats||{}, ids=s.srcIds||{};
+    return `<div class="notice info"><b>来源白名单</b>：本 Tab 按你的要求只保留 <b>TapTap / 好游快爆 / 小七</b> 三源
+      （小七 = <code>x7sy.com</code> 新游预约）。原始 <b>${s.rawNew||0} 条</b>新游/测试资讯 →
+      <b>按游戏名合并为 ${s.merged||0} 个游戏</b>（其中多平台同款 <b>${s.multi||0} 个</b>）；
+      同一游戏的跨源多平台会显示<b>多个来源标签</b>，全部原始链接在弹窗里。<br>
+      三源实测：TapTap <b>${ids['ref-taptap']||0}</b> / 好游快爆 <b>${ids['ref-haoyou']||0}</b> / 小七 <b>${ids['ref-x7']||0}</b> 条。<br>
+      <b>已修的口径坑</b>：改为<b>直读 GameNews SQLite（<code>mode=ro</code> 只读）</b>，不再走 <code>/api/articles</code> 分页 ——
+      API 只回 <b>301</b> 条而库内实为 <b>423</b> 条，<b>小七整源 22 条此前因此全丢</b>。<br>
+      <b>v6 新补字段</b>：好游快爆的 <code>timelineDate</code>（时间轴上线日期）与 <code>haoyouPublisher</code>（发行商）
+      此前没被抽取 ⇒ 好游独家记录的绿色时效行只能吃兜底文案；现已补进卡片与弹窗。
+      上游确实无评分 / 热度字段的记录，右侧数字位显示「—」占位（不留空），保证全部卡片的右列位置完全一致。</div>`;
+  }
+  if(k==='mEvent'){
+    const s=D.mStats||{}, ids=s.srcIds||{};
+    return `<div class="notice"><b>来源说明</b>：活动取自同库的 <code>版本更新 / 联动活动 / 活动</code> 类目 + 标题关键词扩筛，
+      共 <b>${(D.mEvent||[]).length}</b> 条。库内三源合计 ${(ids['ref-taptap']||0)+(ids['ref-haoyou']||0)+(ids['ref-x7']||0)} 条。<br>
+      <b>活动不合并</b>：同一游戏的不同活动是不同事件，逐条展示；上游仍无独立活动出口（方案 M5 待新增
+      <code>/api/cli/intel/mobile/events</code>），故本期仍是类目 + 关键词扩筛。</div>`;
+  }
+  if(k==='mPlay'){
+    const s=(T.playStats||{});
+    return `<div class="notice"><b>来源说明</b>：<code>mobilehub.json</code> 共 <b>${(T.play||0).toLocaleString()}</b> 条
+      「模拟器可玩性」数据，累计 <b>${(s.configs||0).toLocaleString()}</b> 套配置、<b>${(s.records||0).toLocaleString()}</b> 条实机记录。
+      标注：可玩档位 / 实测帧数区间 / 配置套数 / 实测设备台数。</div>`;
+  }
+  return '';
+}
+
+/* ★v12：`rname()` 与 `renderReport()`（端游可视报告）已随报告模块整体移除。
+   data.js 的 `D.report` 仍保留（含 issues / latest / repo / onlineCount），重跑构建脚本
+   或日后想恢复时，从 `index.v11.bak.html` 取回本段即可。 */
+
+/* ---------------- 筛选栏 ---------------- */
+function optsFor(tab, grp, list){
+  if(grp.opts) return grp.opts.map(([v,lb])=>({v,lb}));
+  // auto：从当前数据里取 distinct 值
+  const seen=new Map();
+  for(const a of list){
+    const v=a[grp.field];
+    if(v===undefined||v===null||v==='') continue;
+    seen.set(v,(seen.get(v)||0)+1);
+  }
+  let arr=[...seen.entries()].map(([v,n])=>({v,lb:v,n}));
+  if(grp.top){
+    const counts={}; for(const a of list){const v=a[grp.field]; if(v) counts[v]=(counts[v]||0)+1;}
+    arr=arr.sort((a,b)=>(counts[b.v]||0)-(counts[a.v]||0)).slice(0,grp.top);
+  }else{
+    arr.sort((a,b)=>b.n-a.n);
+  }
+  return arr.map(x=>({v:x.v,lb:x.lb}));
+}
+function filterBar(tab, list){
+  const su=SORTS[tab]; const groups=FILTERS[tab]||[];
+  let html='';
+  if(su){
+    html+=`<div class="frow"><span class="flb">排序</span><div class="pills">`+
+      su.map(s=>`<button class="pill-b ${sortK===s.k?'on':''}" data-sort="${s.k}"><span class="lb">${s.lb}</span>${s.nm}</button>`).join('')+
+      `</div><span class="fcount" id="fcount"></span></div>`;
+  }
+  groups.forEach(g=>{
+    const opts=optsFor(tab,g,list);
+    if(!opts.length) return;
+    html+=`<div class="frow"><span class="flb">${g.lb}</span>`+
+      opts.map(o=>{
+        const on = fx[g.k] && fx[g.k].size && fx[g.k].has(o.v);
+        return `<button class="tg ${on?'on':''}" data-fg="${g.k}" data-fv="${esc(o.v)}">${esc(o.lb)}</button>`;
+      }).join('')+`</div>`;
+  });
+  return `<div class="filter-bar">
+    <div class="frow"><div class="search"><span class="si">🔍</span>
+      <input id="kw" placeholder="搜索名称 / 品类 / 来源 / 作者…" value="${esc(kw)}"></div>
+      ${html.includes('fcount')?'':'<span class="fcount" id="fcount"></span>'}
+    </div>${html}</div>`;
+}
+
+/* ---------------- ★v10 排行榜：4 个分榜 ----------------
+   用户口径：**不要搜索、不要品类筛选**，只要 PC 新游 / PC 热游 / 手机新游 / 手机热游 四个榜。
+
+   与原实现的三点差别：
+     ① 榜的维度从「最新上架 / 热度 / 容量」换成「端 × 冷热」—— 容量榜整块取消。
+     ② 数据池 = **各自 Tab 的池子**（pcNew / pcHot / mNew），不再是独立的 pcRank 池。
+        这样行上的 `data-d`（tab）天然对齐 openDetail 的取数路径，点榜行 = 点那个 Tab 的同一条。
+     ③ 本页**不挂搜索、不挂筛选**：四个榜跨 3 个 Tab、来源口径也不一致
+        （PC 是 XD / 机地，手游是 TapTap / 好游 / 小七），一套筛选器套上去必然有榜被筛空。
+
+   ⚠️ 手机热游榜的**口径坑**（实测，别绕过去）：
+     mNew 的 `hot` 跨源**差 3 个数量级** —— TapTap 关注最高 822 万 / 好游快爆预约 143 万 /
+     小七预约 2.2 万；hotLabel 还有 5 种粒度（关注 / 预约 / 评论）。
+     直接按 hot 混排 ⇒ 前 12 名会被 TapTap 关注全部占满，榜就退化成「TapTap 关注榜」。
+     所以做**按源归一化**：先把每条换算成「在本源内的百分位 0~1」再混排，
+     行内标注原始口径，**原始数值照常展示、不篡改**。
+*/
+const RANK_BOARDS = [
+  { nm:'PC 新游榜', ic:'🆕', tab:'pcNew', top:12,
+    sub:'上架日期降序 · Top 12',
+    has:a=>!!a.ts,
+    sort:(a,b)=>String(b.ts||'').localeCompare(String(a.ts||'')),
+    txt:a=>a.date || '—', dim:true },
+
+  { nm:'PC 热游榜', ic:'🔥', tab:'pcHot', top:12,
+    sub:'热度降序 · Top 12',
+    has:a=>Number(a.hot) > 0,
+    sort:(a,b)=>Number(b.hot)-Number(a.hot),
+    txt:a=>fmtHot(a.hot), hm:true },
+
+  { nm:'手机新游榜', ic:'📱', tab:'mNew', top:12,
+    sub:'上线时间降序 · Top 12',
+    has:a=>!!(a.launchTs || a.ts),
+    sort:(a,b)=>(Number(b.launchTs)||0)-(Number(a.launchTs)||0) ||
+                String(b.ts||'').localeCompare(String(a.ts||'')),
+    txt:a=>a.launchText || a.suffix || a.status || '—', dim:true,
+    name:a=>a.game || a.title, chip:a=>a.cat || '' },
+
+  { nm:'手机热游榜', ic:'⚡', tab:'mNew', top:12,
+    sub:'各源热度归一化后混排 · Top 12',
+    has:a=>Number(a.hot) > 0,
+    sort:(a,b)=>(hotPct(b)-hotPct(a)) || (Number(b.hot)-Number(a.hot)),
+    txt:a=>fmtHot(a.hot), hm:true,
+    name:a=>a.game || a.title, chip:a=>a.hotLabel || '' },
+];
+
+/* 按源归一化：把每条 hot 换算成「在本源内的百分位」0~1（源内最低=0、最高=1）。
+   单条源（n<=1）记 1，避免除零。用**对象引用**当 key —— D.mNew 里的对象是唯一实例。 */
+let _HOT_PCT = null;
+function hotPctMap(){
+  if(_HOT_PCT) return _HOT_PCT;
+  _HOT_PCT = new Map();
+  const g = {};
+  (D.mNew||[]).forEach(a=>{
+    if(!(Number(a.hot) > 0)) return;
+    const k = a.srcKey || a.src || '?';
+    (g[k] = g[k] || []).push(a);
+  });
+  Object.keys(g).forEach(k=>{
+    const arr = g[k].slice().sort((x,y)=>Number(x.hot)-Number(y.hot));
+    const n = arr.length;
+    arr.forEach((a,idx)=>_HOT_PCT.set(a, n <= 1 ? 1 : idx/(n-1)));
+  });
+  return _HOT_PCT;
+}
+const hotPct = a => hotPctMap().get(a) || 0;
+
+const RN_G = ['g1','g2','g3'];
+
+/* ★v10：不再接收外部 list —— 每个榜从**自己那个 Tab 的池子**取数。
+   于是 data-d = 该 Tab、data-i = 该 Tab 内的下标，openDetail 走 D[tab][i]，必然对上。 */
+function rankBoardsHTML(){
+  const out = RANK_BOARDS.map(b=>{
+    const src = D[b.tab] || [];
+    const rows = src.filter(b.has).sort(b.sort).slice(0, b.top);
+    if(!rows.length) return '';
+    const body = rows.map((a,k)=>{
+      const gi = src.indexOf(a);                 /* 弹窗按该 Tab 的下标取数 */
+      const nm = b.name ? b.name(a) : a.title;
+      const chip = b.chip ? b.chip(a) : '';
+      return `<div class="rrow" data-d="${b.tab}" data-i="${gi}" title="点击查看 ${esc(nm)} 详情">
+        <span class="rno ${RN_G[k]||''}">${k+1}</span>
+        ${cover(a.cover || a.img, 'rth')}
+        <span class="rgname">${titleHTML(nm)}</span>
+        ${chip?`<span class="rpill">${esc(chip)}</span>`:''}
+        <span class="rval ${b.hm?'hm':''}${b.dim?' dim':''}">${esc(b.txt(a))}${b.unit?`<span class="u">${esc(b.unit)}</span>`:''}</span>
+      </div>`;
+    }).join('');
+    return `<div class="rankboard">
+      <div class="rbhead"><span class="rbic">${b.ic}</span><h3>${b.nm}</h3><span class="rbsub">${b.sub}</span></div>
+      <div class="rlist">${body}</div>
+    </div>`;
+  }).join('');
+  return out
+    ? `<div class="rankboards">${out}</div>`
+    : `<div class="empty"><div class="big">🏆</div>榜单暂无可排的数据</div>`;
+}
+
+/* ---------------- ★v8 首页（用户需求⑤）：大图轮播 + 三块精选 ----------------
+   轮播条目取自真实数据（PC 热游按热度 / PC 新游按上架 / 手游新游按热度），
+   **不新造内容**；每条都带 (tab, 下标)，点「查看详情」走同一个弹窗。 */
+const HERO_MS = 5000;
+let heroIdx = 0, heroTimer = null;
+
+function heroItems(){
+  const pick = (tab, n, cmp, ok) => (D[tab]||[])
+    .map((a,i)=>({a,i}))
+    .filter(x=>!ok || ok(x.a))
+    .sort((x,y)=>cmp(x.a,y.a))
+    .slice(0,n)
+    .map(x=>({tab, a:x.a, i:x.i}));
+  const byHot = (a,b)=>Number(b.hot||0)-Number(a.hot||0);
+  const byTs  = (a,b)=>String(b.ts||'').localeCompare(String(a.ts||''));
+  return [
+    ...pick('pcHot', 3, byHot, a=>Number(a.hot)>0).map(x=>({...x, badge:'PC 热游', cls:'hot'})),
+    ...pick('pcNew', 3, byTs).map(x=>({...x, badge:'PC 新游', cls:''})),
+    ...pick('mNew',  3, byHot, a=>Number(a.hot)>0).map(x=>({...x, badge:'手游新游', cls:'mb'})),
+  ];
+}
+/* 小工具：从游戏记录里取「中文名 / 英文名（括号）」与可展示指标 */
+function heroMeta(it){
+  const a = it.a;
+  const p = nameParts(a.title || a.game || '');
+  const stats = [];
+  if(it.tab === 'mNew'){
+    if(Number(a.score) > 0) stats.push(['评分', fmtScore(a.score), '']);
+    if(Number(a.hot) > 0)   stats.push([a.hotLabel || '热度', fmtHot(a.hot), 'up']);
+    (a.sources||[]).forEach(s=>stats.push(['来源', s.src, 'dim']));
+  }else{
+    if(Number(a.scoreV) > 0) stats.push(['评分', Number(a.scoreV).toFixed(1), '']);
+    if(Number(a.hot) > 0)    stats.push(['热度', fmtHot(a.hot), 'up']);
+    if(a.size)               stats.push(['容量', a.size, 'dim']);
+    if(a.genre)              stats.push(['品类', a.genre, 'dim']);
+  }
+  return {
+    title: p.main, en: p.changed ? p.en : '',
+    cover: a.cover || a.img || '',
+    srcKey: a.srcKey || (a.sources && a.sources[0] && a.sources[0].key) || '',
+    srcName: a.src || (a.sources || []).map(s=>s.src).join(' + ') || '',
+    tags: (a.tags || []).slice(0,2),
+    cat: a.genre || a.cat || '',
+    intro: a.intro || '',
+    stats,
+    url: a.url || '',
+  };
+}
+function renderHome(){
+  const items = heroItems();
+  const slides = items.map((it,k)=>{
+    const m = heroMeta(it);
+    const pic = m.cover
+      ? `<div class="ph">🎮</div>
+         <img decoding="async" referrerpolicy="no-referrer"
+              src="${esc(m.cover)}" alt="" onload="reveal(this)" onerror="this.remove()">
+         <span class="hsrc ${SRC_CLS[m.srcKey]||''}">${esc(m.srcName||'—')}</span>`
+      : `<div class="ph">🎮</div>`;
+    const stats = m.stats.map(s=>
+      `<div><span class="k">${esc(s[0])}</span><span class="v ${s[2]}">${esc(s[1])}</span></div>`).join('');
+    return `<div class="hslide${k===0?' on':''}" data-slide="${k}">
+      <div class="hpic">${pic}</div>
+      <div class="hinfo">
+        <div class="htagrow">
+          <span class="hbadge ${it.cls}">${it.badge}</span>
+          ${m.cat?`<span class="pill">${esc(m.cat)}</span>`:''}
+          ${m.tags.map(t=>`<span class="pill">${esc(t)}</span>`).join('')}
+        </div>
+        <div class="hname">${esc(m.title)}${m.en?`<span class="en">（${esc(m.en)}）</span>`:''}</div>
+        <div class="hstat">${stats}</div>
+        ${m.intro?`<div class="hintro">${esc(m.intro)}</div>`:''}
+        <div class="hbtns">
+          <button type="button" data-hero-d="${it.tab}" data-hero-i="${it.i}">查看详情</button>
+          ${m.url?`<a class="sec" href="${esc(m.url)}" target="_blank" rel="noopener">打开原页</a>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  /* ★v9：右侧两张预览小卡 —— 取「下一张 / 下下张」（循环），随主图一起切 */
+  const N = items.length;
+  const sets = items.map((_,k)=>{
+    const card = x=>{
+      const mm = heroMeta(x);
+      return `<div class="hsitem" data-hero-d="${x.tab}" data-hero-i="${x.i}" title="点击查看 ${esc(mm.title)} 详情">
+        <div class="ph">🎮</div>
+        ${mm.cover?`<img decoding="async" referrerpolicy="no-referrer" src="${esc(mm.cover)}" alt="" onload="reveal(this)" onerror="this.remove()">`:''}
+        <span class="cap"><span class="bd">${x.badge}</span>${esc(mm.title)}</span>
+      </div>`;
+    };
+    return `<div class="hside-set${k===0?' on':''}" data-set="${k}">${
+      [items[(k+1)%N], items[(k+2)%N]].map(card).join('')}</div>`;
+  }).join('');
+
+  const dots = items.map((_,k)=>`<i class="${k===0?'on':''}" data-hero-dot="${k}"></i>`).join('');
+  const hero = N ? `<div class="hero" id="hero">
+    <div class="hmain" id="heroSlides">
+      ${slides}
+      <div class="hctrl">
+        <button type="button" data-hero-nav="-1" aria-label="上一张">‹</button>
+        <div class="hdots" id="heroDots">${dots}</div>
+        <button type="button" data-hero-nav="1" aria-label="下一张">›</button>
+      </div>
+      <div class="hprog" id="heroProg"></div>
+    </div>
+    <div class="hside" id="heroSide">${sets}</div>
+  </div>` : '';
+
+  const sec = (ic, nm, sub, tab, rows, list, kind) => `<div class="hsec">
+    <div class="hsechd"><span class="ic">${ic}</span><h3>${nm}</h3><span class="sub">${sub}</span>
+      <button class="more" type="button" data-go="${tab}">查看全部 ›</button></div>
+    <div class="hseclist ${kind}">${rows.map(r=>list(r.a, r.i, tab)).join('')}</div>
+  </div>`;
+
+  const wrap = (tab, n, cmp, ok) => (D[tab]||[])
+    .map((a,i)=>({a,i})).filter(x=>!ok || ok(x.a)).sort((x,y)=>cmp(x.a,y.a)).slice(0,n);
+  const byHot = (a,b)=>Number(b.hot||0)-Number(a.hot||0);
+  const byTs  = (a,b)=>String(b.ts||'').localeCompare(String(a.ts||''));
+
+  /* ★v10：数量必须与 CSS 的**固定列数**配对，否则又会出现孤行：
+     PC 两块各 10 张（5 列 × 2 行）；手游块 6 张（3 列 × 2 行）。 */
+  const pcNew  = wrap('pcNew', 10, byTs);
+  const pcHot  = wrap('pcHot', 10, byHot, a=>Number(a.hot)>0);
+  const mbNew  = wrap('mNew', 6, byHot, a=>Number(a.hot)>0);
+
+  return hero
+    + sec('🎮','PC 新游 · 精选','最新上架 · Top 10','pcNew', pcNew, (a,i,t)=>cardPC(a,i,false,t), 'pc')
+    + sec('🔥','PC 热游 · 精选','按热度 · Top 10','pcHot', pcHot, (a,i,t)=>cardPC(a,i,false,t), 'pc')
+    + sec('📱','手游新游 · 精选','按热度（三源合并） · Top 6','mNew', mbNew, (a,i,t)=>cardMNew(a,i,t), 'mb');
+}
+function heroGo(k){
+  const slides = document.querySelectorAll('#heroSlides .hslide');
+  if(!slides.length) return;
+  const n = slides.length;
+  heroIdx = ((k % n) + n) % n;
+  slides.forEach((el,i)=>el.classList.toggle('on', i === heroIdx));
+  /* ★v9：右侧两张预览小卡跟着主图一起切 */
+  document.querySelectorAll('#heroSide .hside-set').forEach((el,i)=>el.classList.toggle('on', i === heroIdx));
+  document.querySelectorAll('#heroDots i').forEach((el,i)=>el.classList.toggle('on', i === heroIdx));
+  syncImgs(document.getElementById('heroSlides'));
+  syncImgs(document.getElementById('heroSide'));
+}
+function stopHero(){ if(heroTimer){ clearInterval(heroTimer); heroTimer = null; } }
+function startHero(){
+  stopHero();
+  const root = document.getElementById('hero');
+  if(!root) return;
+  heroGo(0);
+  const tick = ()=>{ heroTimer = setInterval(()=>heroGo(heroIdx+1), HERO_MS); };
+  tick();
+  /* 悬停暂停：用户在看某一条时不该被切走 */
+  root.addEventListener('mouseenter', stopHero);
+  root.addEventListener('mouseleave', ()=>{ stopHero(); tick(); });
+}
+
+/* ---------------- 渲染 ---------------- */
+/* ===== ★v13 搜索重做（NEXT P0-1）================================================
+   原实现：`list.filter(a => JSON.stringify(a).toLowerCase().includes(k))`
+     —— 把整条记录序列化后做子串匹配。三个毛病：
+     ① 搜 `http` 会命中**每一条**（URL 参与匹配）；
+     ② 命中的是哪个字段、为什么命中，用户无从得知；
+     ③ 无权重 —— 主名命中和简介命中一视同仁。
+
+   现改为：**显式字段白名单 + 命中字段加权**。
+     · 只在这些字段里找（不再把整条记录扔进去）；
+     · 字段按「用户搜索意图」从强到弱排在 SEARCH_FIELDS 里，
+       命中越靠前的字段得分越高，结果按得分降序（同分保持原有顺序，sort 是稳定的）。
+   注意：**不加高亮**（那要动卡片渲染层，风险外溢），本轮只解决「搜得到 / 排序合理」。 */
+const SEARCH_FIELDS = [
+  ['title', 'game', 'full'],                    /* ① 游戏主名 —— 最强信号 */
+  ['en', 'enName', 'alias', 'aliases'],         /* ② 英文名 / 别名 */
+  ['publisher', 'author', 'src', 'srcName'],    /* ③ 厂商 / 作者 / 来源 */
+  ['genre', 'cat', 'tags'],                     /* ④ 品类 / 标签 */
+  ['intro', 'note', 'launchText'],              /* ⑤ 简介 / 备注 —— 最弱 */
+];
+function searchScore(a, k) {
+  for (let i = 0; i < SEARCH_FIELDS.length; i++) {
+    for (const f of SEARCH_FIELDS[i]) {
+      const v = a[f];
+      if (v === undefined || v === null || v === '') continue;
+      const arr = Array.isArray(v) ? v : [v];
+      for (const x of arr) {
+        if (String(x).toLowerCase().includes(k)) return SEARCH_FIELDS.length - i;
+      }
+    }
+  }
+  return 0;
+}
+
+function render(){
+  const main=document.getElementById('main'), cfg=TABS[cur];
+  /* ★v11：把当前 Tab 写到 #main 上，作为「按 Tab 自适应卡位比例」的 CSS 锚点
+     —— `#main[data-tab="pcNew"]{--th-ar:16 / 9}`，其余 Tab 走 #main 默认的 3/2。
+     原有控制流一律不动，本行只新增一个属性。 */
+  main.dataset.tab = cur;
+  const head=`<div class="crumb"><h2>${cfg.t}</h2>
+    <span class="srcbadge real">● 真实数据</span></div>`;
+
+  stopHero();                                   /* ★ 离开首页前先停掉轮播计时器 */
+  if(cur==='home'){
+    main.innerHTML = head + renderHome() + footNote();
+    bindMain(main); syncImgs(main); startHero();
+    return;
+  }
+
+  const all = D[cur] || [];
+  /* ★v13：原来的 `groups` / `list` 两个局部变量已随「筛选+搜索+排序」下沉到
+     listSection()，render 这一层不再需要它们（留着就是死代码）。 */
+
+  /* ★v10：排行榜 = 4 个分榜页，**整体绕过「搜索 + 筛选 + 排序栏」**（用户口径：不要搜索/品类筛选）。
+     每榜自带池子与排序，所以这里既不过滤也不渲染 filterBar。
+     —— 早退必须放在这一步、而不是继续往下走：否则会渲染出一个对本页毫无作用的搜索框。 */
+  if(cfg.rankBoard){
+    curList = all;                       /* 保留：本页已无 data-d="pcRank" 的行，仅作兜底 */
+    main.innerHTML = head + noticeFor(cur) + rankBoardsHTML() + footNote();
+    bindMain(main);
+    syncImgs(main);
+    return;
+  }
+
+  const bar = filterBar(cur, all);
+  const sec = listSection(cur, all);
+  /* ★v13：结果网格外面多包了一层 `#listbox` —— 它没有样式，纯粹是「可单独替换的锚点」，
+     供搜索时只换列表、不重建外壳（详见 refreshList 与 bindMain 里的说明）。 */
+  main.innerHTML = head + noticeFor(cur) + bar
+                 + `<div id="listbox">${sec.grid}</div>` + footNote();
+  updateCount(sec.n, all.length);
+  bindMain(main);
+  syncImgs(main);      /* ★v6：对「已在缓存里、没派发 load」的图补跑一次自适应 */
+}
+
+/* ---------------- ★v13 结果列表：筛选 + 搜索 + 排序 + 建网格 ----------------
+   抽成独立函数，是因为它现在有**两个调用方**、且必须共用同一份实现（否则两处必然漂移）：
+     · render()       —— 整页渲染（切 Tab / 点排序 / 点筛选）
+     · refreshList()  —— 只换结果列表（搜索框输入时）
+   返回 { grid, n }：grid 是可直接塞进 #listbox 的片段，n 是命中条数。 */
+function listSection(tab, all){
+  const cfg = TABS[tab];
+  let list = all.slice();
+
+  // 筛选（★v5：字段可能是数组，如手游多平台 srcKeys）
+  for(const g of (FILTERS[tab]||[])){
+    const set=fx[g.k];
+    if(set && set.size) list = list.filter(a=>{
+      const v=a[g.field];
+      return Array.isArray(v) ? v.some(x=>set.has(x)) : set.has(v);
+    });
+  }
+
+  /* 搜索（★v13：字段白名单 + 加权，取代 JSON.stringify 全量匹配） */
+  let sc = null;                       /* 命中打分表；无搜索词时为 null（不参与排序） */
+  if(kw){
+    const k = kw.trim().toLowerCase();
+    if(k){
+      sc = new Map();
+      const hit = [];
+      for(const a of list){
+        const s = searchScore(a, k);
+        if(s > 0){ sc.set(a, s); hit.push(a); }
+      }
+      list = hit;
+    }
+  }
+
+  // 排序（分榜页没有排序按钮，榜单自带排序）
+  const cmp=CMP[sortK];
+  if(cmp) list.sort(cmp);
+  /* ★v13：搜索命中按得分降序。**放在 cmp 之后**，且 Array#sort 是稳定的 ⇒
+     同分结果保留用户选的排序，只把「主名命中」这类强信号顶到前面。 */
+  if(sc) list.sort((a,b)=>sc.get(b)-sc.get(a));
+
+  let grid;
+  if(!list.length){
+    grid=`<div class="empty"><div class="big">🔍</div>没有匹配的结果<br><span style="font-size:12px">试试清空筛选或搜索词</span></div>`;
+  }else{
+    const body=list.map((a,i)=>{
+      if(tab==='pcNew'||tab==='pcHot') return cardPC(a,i,false,tab);
+      /* ★v10：pcRank 已在 render 的 rankBoard 分支里早退，不会再走到这里 */
+      if(tab==='pcTrainer')return cardTrainer(a,i,tab);
+      if(tab==='pcMod')    return cardMod(a,i,tab);
+      if(tab==='mPlay')    return cardPlay(a,i,tab);     /* ★ 与 PC 端游同骨架 */
+      if(tab==='mEvent')   return cardMEvent(a,i,tab);
+      return cardMNew(a,i,tab);
+    }).join('');
+    grid=`<div class="grid ${cfg.kind==='mb'?'mb':'pc'}">${body}</div>`;
+  }
+
+  curList = list;                      /* ★ 弹窗按序号取数据 */
+  return { grid, n: list.length };
+}
+
+/* ★v13：只重刷结果列表，**不动 #main 的外壳**（页头 / 提示条 / 筛选栏 / 页脚一律原样留着）。
+   这是「搜索框不再丢焦点」的根治办法 —— 详见 bindMain 里那段说明。 */
+function refreshList(){
+  const main=document.getElementById('main'); if(!main) return;
+  const box=main.querySelector('#listbox');
+  if(!box) return;                     /* 首页 / 排行榜页没有列表区，直接退出 */
+  const all = D[cur] || [];
+  const sec = listSection(cur, all);
+  box.innerHTML = sec.grid;
+  updateCount(sec.n, all.length);
+  syncImgs(box);
+}
+
+/* 结果计数（`显示 N / 共 M 条`）—— render 与 refreshList 共用 */
+function updateCount(n, total){
+  const fc=document.getElementById('fcount');
+  if(fc) fc.textContent = `显示 ${n} / 共 ${total} 条`;
+}
+
+/* 统一的交互绑定（列表页与报告页共用；报告页也必须走这里，否则折叠点击不会生效） */
+function bindMain(main){
+  const inp=document.getElementById('kw');
+  if(inp){
+    /* ★v13：搜索框不再整页重渲染。
+       原实现（v8~v12）：
+         kw = e.target.value; render();
+         const n=document.getElementById('kw'); if(n){ n.focus(); n.setSelectionRange(p,p); }
+       —— 两个毛病其实是**同一个根因**：
+         · render() 会重建整个 #main，输入框节点本身也被替换 ⇒ 焦点与光标必然丢失，
+           于是只能在渲染后「把焦点和光标手工捞回来」，这就是那两行 hack；
+         · 而重建的代价远不止输入框 —— 页头 / 提示条 / 筛选栏 / 页脚全部重算并重新绑定，
+           长列表下每敲一个字都要跑一遍。
+       现在改为只替换 #listbox（见 refreshList）：输入框节点原样保留，
+       ⇒ **焦点与光标天然不丢，hack 整段删除**；筛选栏也不重建，不会出现重复绑定。
+
+       ★ 刻意**不做防抖**：防抖只是把「渲染太频繁」这个表象压下去，根因是「渲染范围过大」；
+         而且防抖会把 DOM 更新推到定时器里 —— 输入与结果不再同步，
+         依赖「派发 input 后立即读 DOM」的同步断言会读到旧 DOM。根治范围问题后，同步更新不再有代价。 */
+    inp.addEventListener('input', e=>{
+      kw = e.target.value;
+      refreshList();
+    });
+  }
+  main.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{ sortK=b.dataset.sort; render(); }));
+  main.querySelectorAll('[data-fg]').forEach(b=>b.addEventListener('click',()=>{
+    fxToggle(b.dataset.fg, b.dataset.fv); render();
+  }));
+  /* ★v8 首页：轮播翻页 / 指示点 / 条目「查看详情」/ 区块「查看全部」 */
+  main.querySelectorAll('[data-hero-nav]').forEach(b=>b.addEventListener('click',()=>{
+    stopHero(); heroGo(heroIdx + Number(b.dataset.heroNav));
+  }));
+  main.querySelectorAll('[data-hero-dot]').forEach(d=>d.addEventListener('click',()=>{
+    stopHero(); heroGo(Number(d.dataset.heroDot));
+  }));
+  main.querySelectorAll('[data-hero-d]').forEach(b=>b.addEventListener('click',()=>{
+    openDetail(b.dataset.heroD, Number(b.dataset.heroI));
+  }));
+  main.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>goTab(b.dataset.go)));
+}
+
+function footNote(){
+  return `<div class="foot"><b>Demo 说明</b>：数据为 ${esc((D.meta&&D.meta.builtAt)||'')} 从本机真实源抽取的<b>快照</b>，非实时、非编造。
+    正式版将改为只读 BFF 契约层 <code>/api/cli/intel/*</code>（既有路由一行不改，只加只读出口）；端游报告走 GitHub Pages 旁路。<br>
+    <b>图片处理</b>：<b>卡片与轮播</b>一律「容器定比 + <code>object-fit:cover</code> 满幅」——
+    卡位统一，方图进 16:9 会裁掉上下约 44%（这是「满幅统一」的代价，取舍见 <code>图片适配对照.html</code>）；
+    <b>详情弹窗的大图尺寸完全由 CSS 决定</b>（宽图铺满整宽、方图 / 竖图限高后完整显示），不做任何比例判断 ——
+    旧写法用 <code>onload</code> 读原图宽高判比例，图片命中缓存时该回调可能早于节点入树触发而静默失效，方形图会退回
+    <code>cover</code> 被裁成一条横带，这就是「弹窗大图被截」的根因。
+    所有图片统一带 <code>referrerpolicy="no-referrer"</code>（实测 TapTap 图床对 localhost 来源头返回 HTTP 567）。<br>
+    <b>交互</b>：首页为<b>大图轮播</b>（5 秒自动切换、悬停暂停、箭头 / 指示点手动翻页）+ PC 新游 / PC 热游 / 手游新游三块精选；
+    <b>排行榜</b>为 <b>PC 新游 / PC 热游 / 手机新游 / 手机热游</b> 四个分榜（各 Top 12，不设搜索与筛选）；
+    <b>所有卡片与排行榜行点击均弹窗</b>显示详情（不再直接跳走），弹窗内含大图、评分 / 热度、参数字段、平台直达按钮。<br>
+    <b>未实现（Demo 范围外）</b>：实时取数、跨源统一搜索、exe／apk 壳、更新链路、离线快照兜底。</div>`;
+}
+
+/* ================= 详情弹窗（★v6：版式对齐 PC 游戏工作台详情抽屉） =================
+   结构（自上而下）：hero 大图 + 渐变 + 标题压图 + 来源徽标
+                   → 黄色口径提示条 → 大号数字行 → KV 卡片网格 → 分区块（介绍/标签）
+                   → 平台直达按钮组 → 底部说明
+   ★ 与 v5 的差别：v5 只有「标题 + 标签 + 5 格 KV + 一个链接」，用户反馈「内容太少了」；
+     本版把各 Tab 的原项目字段尽可能带出（PC 端游 9 格 KV + 最多 4 个直达入口）。      */
+/* 取值兜底：空/0/undefined 一律显示 "—"（注意：别用 T 这个名字，顶部已有 const T = D.totals） */
+const nz = (v, d) => (v === undefined || v === null || v === '' || v === 0) ? (d === undefined ? '—' : d) : v;
+
+/* 各来源徽标配色（弹窗右上角） */
+const DSRC_CLS = {xd:'src-xd', jidi:'src-jidi', steam:'src-steam',
+                  taptap:'src-taptap', haoyou:'src-haoyou', x7:'src-x7',
+                  gamersky:'src-gamersky', gcores:'src-gcores'};
+
+function detailOf(tab, a){
+  const scls = SRC_CLS[a.srcKey] || '';
+  const nm = nameParts(a.title || a.game || '');
+
+  /* ---------------- 手游新游（三源合并卡） ---------------- */
+  if(tab === 'mNew'){
+    const plats = (a.sources || []);
+    let big;
+    if(Number(a.score) > 0){
+      big = {v: fmtScore(a.score), lab: '评分（源站评分 · 满分 10）',
+             chips: [['收录 ' + (a.n || 1) + ' 条', ''],
+                     ...(a.hot ? [['热度 ' + fmtHot(a.hot) + '（' + (a.hotLabel || '') + '）', 'wn']] : [])]};
+    }else if(a.hot){
+      big = {v: fmtHot(a.hot), hm: true, lab: '热度（' + (a.hotLabel || '关注 / 预约数') + '）',
+             chips: [['收录 ' + (a.n || 1) + ' 条', '']]};
+    }else{
+      big = {v: '—', dim: true, lab: '上游暂无评分 / 热度数据',
+             chips: [['收录 ' + (a.n || 1) + ' 条', '']]};
+    }
+    return {
+      img: a.img, title: a.game || a.title, en: '',
+      src: {nm: plats.map(p => p.src).join(' + ') || a.src, cls: scls},
+      notice: '本卡由<b>同一游戏</b>在三源（TapTap / 好游快爆 / 小七）的资讯记录<b>合并</b>而成，多平台会并列多个来源标签；下方列出全部原始链接。',
+      big,
+      kv: [
+        ['上线状态', nz(a.status)],
+        ['上线时间', nz(a.launchText || a.tlDate)],
+        ['热度', a.hot ? fmtHot(a.hot) : ''],
+        ['热度口径', a.hotLabel || ''],
+        ['评分', Number(a.score) > 0 ? fmtScore(a.score) : ''],
+        ['类目', nz(a.cat)],
+        ['发行商', a.publisher || ''],
+        ['收录来源', plats.map(p => p.src).join(' + ')],
+        ['收录条数', (a.n || 1) + ' 条'],
+      ],
+      blocks: [
+        a.intro ? {h: '游戏简介', text: a.intro} : null,
+        (a.tags || []).length ? {h: '游戏标签', cnt: a.tags.length + ' 个',
+                                 tags: a.tags.map(t => ({t}))} : null,
+      ].filter(Boolean),
+      links: (a.links || []).map((x, k) => ({t: '打开 ' + x.src + ' 原页', url: x.url, sec: k > 0})),
+      foot: '上线时间取自各源预约 / 上线时间戳；好游快爆无时间戳的记录用其时间轴日期（<code>timelineDate</code>），不推算年份。',
+    };
+  }
+
+  /* ---------------- 手游活动 ---------------- */
+  if(tab === 'mEvent'){
+    return {
+      img: a.img, title: a.game || a.title, en: subOf(a),
+      src: {nm: a.src || '', cls: scls},
+      big: null,
+      kv: [
+        ['所属游戏', nz(a.game)],
+        ['类目', nz(a.cat)],
+        ['资讯时间', nz(a.dateText)],
+        ['收录来源', nz(a.src)],
+        ['上线状态', nz(a.status)],
+        ['上线时间', nz(a.launchText || a.tlDate)],
+      ],
+      blocks: [{h: '活动标题', text: a.title}],
+      links: a.url ? [{t: '打开原页', url: a.url}] : [],
+      foot: '活动<b>不合并</b>：同一游戏的不同活动是不同事件，逐条展示。',
+    };
+  }
+
+  /* ---------------- 手游可玩端游 ---------------- */
+  if(tab === 'mPlay'){
+    /* ★v6：帧数原文常是整句（「帧数不显示，轻微卡顿」），量不出区间时不要拿半截句子当大数字 */
+    const fs = fpsShort(a.fps);
+    let big = null;
+    if(fs){
+      big = {v: fs, lab: '实测帧数', chips: [['配置 ' + a.configs + ' 套', 'gn']]};
+    }else if(a.configs){
+      big = {v: String(a.configs), lab: '实测配置套数', chips: [[a.fps || '帧数未标注', 'wn']]};
+    }
+    return {
+      img: a.cover, title: a.title,
+      en: a.full && a.full !== a.title ? a.full : (a.alias || ''),
+      src: {nm: a.tier || '待测', cls: a.tierKey === 'ok' ? 'src-gcores' : ''},
+      big,
+      kv: [
+        ['可玩档位', nz(a.tier)],
+        ['实测帧数', nz(a.fps)],
+        ['配置套数', nz(a.configs)],
+        ['实测设备', a.devices ? a.devices + ' 台' : ''],
+        ['代表芯片', a.chip || ''],
+        ['英文别名', a.alias || ''],
+        ['游戏全名', a.full || ''],
+      ],
+      blocks: [],
+      links: a.url ? [{t: '打开原页', url: a.url}] : [],
+      foot: '来自本机 <code>mobilehub.json</code> 的「模拟器可玩性」实测数据（3,264 条游戏 / 16,148 套配置）。',
+    };
+  }
+
+  /* ---------------- PC 修改器 ---------------- */
+  if(tab === 'pcTrainer'){
+    return {
+      img: a.cover, title: a.title, en: a.en || '',
+      src: {nm: a.src || '修改器', cls: scls},
+      big: a.version ? {v: a.version, unit: '', lab: '修改器版本', small: true,
+                        chips: a.steamId ? [['Steam ' + a.steamId, '']] : []} : null,
+      kv: [
+        ['中文名', nz(a.title)],
+        ['英文名', a.en || ''],
+        ['修改器版本', nz(a.version)],
+        ['Steam ID', nz(a.steamId)],
+        ['来源', nz(a.src)],
+        ['类型', '修改器'],
+      ],
+      blocks: [],
+      links: a.url ? [{t: '打开修改器页', url: a.url}] : [],
+      foot: '修改器数据来自本机 <code>trainers.json</code>（3,660 条 / 5 个来源），Demo <b>按来源轮询取样</b>避免单一来源淹没。',
+    };
+  }
+
+  /* ---------------- PC MOD ---------------- */
+  if(tab === 'pcMod'){
+    return {
+      img: a.cover, title: a.title, en: a.game || '',
+      /* ★v10：来源是「机地」（单一源），不是「MOD」——MOD 是类型。 */
+      src: {nm: a.src || '机地', cls: SRC_CLS[a.srcKey] || ''},
+      big: a.pv ? {v: fmtHot(a.pv), lab: '浏览量',
+                   chips: [['附带链接 ' + (a.nlink || 0) + ' 条', '']]} : null,
+      kv: [
+        ['所属游戏', nz(a.game)],
+        ['类型', nz(a.kind)],
+        ['来源', nz(a.src, '机地')],
+        ['作者', nz(a.author, '匿名')],
+        ['浏览量', a.pv ? fmtHot(a.pv) : ''],
+        ['附带链接', a.nlink ? a.nlink + ' 条' : ''],
+      ],
+      blocks: [],
+      /* ★v10：「原帖」与「游戏页」是**两个不同的东西**，必须分别给。
+         原实现写成 `url = libUrl or url`，把机地原帖覆盖成了匹配到的库页面 ⇒
+         弹窗上那个「打开原帖」实际打开的是 **XD 的游戏页**（实测 Top60 里 51 条有 libUrl）。
+         现在 postUrl（机地原帖）与 libUrl（库页面）各自独立。 */
+      links: [
+        a.postUrl ? {t: '打开原帖（机地）', url: a.postUrl} : null,
+        a.libUrl ? {t: '打开游戏页（' + (a.libSrc === 'xd' ? 'XD' : '机地') + '）', url: a.libUrl} : null,
+      ].filter(Boolean).map((l, k) => Object.assign(l, {sec: k > 0})),
+      foot: 'MOD 帖采集自 <b>机地</b>（单一来源）；「游戏页」是匹配到的端游库条目，两者不是同一页。'
+          + '「附带链接」指该帖附带的网盘 / 下载链接条数，仅展示不跳转网盘。',
+    };
+  }
+
+  /* ---------------- PC 端游（新游 / 热游 / 排行） ---------------- */
+  const links = [
+    a.url ? {t: '打开源站详情页', url: a.url} : null,
+    a.alt ? {t: '打开机地详情页', url: a.alt} : null,
+    (a.jidiUrl && a.jidiUrl !== a.alt) ? {t: '打开机地（跨源）', url: a.jidiUrl} : null,
+    a.appid ? {t: 'Steam 商店页', url: 'https://store.steampowered.com/app/' + a.appid + '/'} : null,
+  ].filter(Boolean).map((l, k) => Object.assign(l, {sec: k > 0}));
+  return {
+    img: a.cover, title: nm.main, en: nm.en,
+    src: {nm: a.src || '', cls: scls},
+    notice: 'PC 端游来自本机 game-aggregator 的 <b>xdgamer + jidi</b> 游戏库（19,239 条），<b>不含 Steam 商店源</b>；Steam 链接为按封面 AppID 拼出的商店页。',
+    big: Number(a.score) > 0
+      ? {v: a.score, unit: '/ 10', lab: '玩家评分', small: false,
+         chips: [a.hot ? ['热度 ' + fmtHot(a.hot), 'wn'] : null, [a.src + ' 收录', '']].filter(Boolean)}
+      : (a.hot ? {v: fmtHot(a.hot), hm: true, lab: '热度（入库热度值）', chips: [[a.src + ' 收录', '']]} : null),
+    kv: [
+      ['游戏类型', (a.genres && a.genres.length) ? a.genres.join(' / ') : (a.genre || '')],
+      ['游戏大小', nz(a.size)],
+      ['上线日期', nz(a.date)],
+      ['源更新时间', a.updated || ''],
+      ['源发布时间', a.published || ''],
+      ['入库来源', nz(a.src)],
+      ['Steam AppID', a.appid ? String(a.appid) : ''],
+      ['跨源机地 ID', a.jidiId || ''],
+      ['库内记录 ID', a.recId || ''],
+    ],
+    blocks: [],
+    links,
+    foot: '全部字段取自本机 <code>games.json</code> 的既有字段（未新增抓取）：<code>appid</code> / <code>jidiId</code> / <code>publishTs</code> / <code>updatedTs</code>。',
+  };
+}
+
+function openDetail(tab, i){
+  /* ★v8：跨 Tab 取数 —— 首页的轮播 / 精选卡片带着**自己所属的 tab**，
+     此时 cur 是 'home'，curList 里没有它们，必须回落到原始数组取。
+     同 Tab 内仍用 curList（= 筛选+搜索+排序后的屏幕所见列表），保证「点第 3 张开第 3 条」。 */
+  const a = (tab === cur) ? (curList || [])[i] : (D[tab] || [])[i];
+  if(!a) return;
+  const d = detailOf(tab, a);
+  const u = esc(d.img || '');
+
+  const hero = d.img
+    ? `<img class="dbg" src="${u}" alt="" aria-hidden="true" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+       <img class="dfg" src="${u}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
+    : `<div class="phbig">🎮</div>`;
+
+  const big = d.big ? `<div class="sline">
+      <span class="sbig${d.big.hm ? ' hm' : ''}${d.big.dim ? ' dim' : ''}${d.big.small ? ' sm' : ''}">${esc(String(d.big.v))}${d.big.unit ? `<span class="u">${esc(d.big.unit)}</span>` : ''}</span>
+      <span class="smeta">${esc(d.big.lab || '')}
+        ${(d.big.chips || []).map(c => `<i class="${c[1] || ''}">${esc(c[0])}</i>`).join('')}</span>
+    </div>` : '';
+
+  const kvRows = (d.kv || []).filter(r => r[1] !== '' && r[1] !== null && r[1] !== undefined);
+  const kv = kvRows.length
+    ? `<div class="dkv">` + kvRows.map(r =>
+        `<div class="it"><div class="k">${esc(r[0])}</div><div class="v">${esc(String(r[1]))}</div></div>`).join('') + `</div>`
+    : '';
+
+  const blocks = (d.blocks || []).map(b => `<div class="dblock">
+      <h4><span class="ic"></span>${esc(b.h)}${b.cnt ? `<span class="cnt">${esc(b.cnt)}</span>` : ''}</h4>
+      ${b.text ? `<p>${esc(b.text)}</p>` : ''}
+      ${b.tags ? `<div class="dtags">` + b.tags.map(t => `<span class="pill ${t.cls || ''}">${esc(t.t)}</span>`).join('') + `</div>` : ''}
+    </div>`).join('');
+
+  const links = (d.links || []).length
+    ? `<div class="dblock"><h4><span class="ic"></span>平台直达<span class="cnt">${d.links.length} 个</span></h4>
+        <div class="dlinks">` + d.links.map((l, k) =>
+        `<a class="${k ? 'sec' : ''}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.t)}</a>`).join('') + `</div></div>`
+    : '';
+
+  document.getElementById('dlg').innerHTML = `
+    <div class="dtop">
+      ${hero}
+      <div class="dgrad"></div>
+      <button class="dclose" id="dx" type="button" aria-label="关闭">✕</button>
+      ${d.src && d.src.nm ? `<span class="dsrc ${DSRC_CLS[a.srcKey] || ''}">${esc(d.src.nm)}</span>` : ''}
+      <div class="dhtitle">
+        <h2>${esc(d.title || '')}</h2>
+        ${d.en ? `<div class="hen">${esc(d.en)}</div>` : ''}
+      </div>
+    </div>
+    <div class="dbody">
+      ${d.notice ? `<div class="dnotice">${d.notice}</div>` : ''}
+      ${big}
+      ${kv}
+      ${blocks}
+      ${links}
+      ${d.foot ? `<div class="dfoot">${d.foot}</div>` : ''}
+    </div>`;
+
+  const mask = document.getElementById('mask');
+  mask.classList.add('on'); mask.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  syncImgs(document.getElementById('dlg'));
+}
+function closeDetail(){
+  const mask = document.getElementById('mask');
+  if(!mask.classList.contains('on')) return;
+  mask.classList.remove('on'); mask.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  document.getElementById('dlg').innerHTML = '';
+}
+/* 弹窗交互：遮罩点击 / 关闭按钮 / ESC（只绑一次） */
+(function bindModal(){
+  const mask = document.getElementById('mask');
+  mask.addEventListener('click', e=>{
+    if(e.target.id === 'mask' || e.target.id === 'dx' || e.target.closest('#dx')) closeDetail();
+  });
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape') closeDetail(); });
+})();
+/* ★v8 统一的换页入口（侧栏点击与首页「查看全部」共用），负责同步高亮 + 滚动复位 */
+function goTab(tab){
+  if(!TABS[tab]) return;
+  document.querySelectorAll('.nav a').forEach(x=>x.classList.toggle('on', x.dataset.tab === tab));
+  resetState(tab);
+  const m = document.getElementById('main'); if(m) m.scrollTop = 0;
+  render();
+}
+
+/* 卡片 / 排行行点击 → 弹窗（事件委托，绑在 document 上只执行一次） */
+document.addEventListener('click', e=>{
+  const el = e.target.closest('.card[data-d], .mcard[data-d], .rrow[data-d]');
+  if(!el) return;
+  const i = Number(el.dataset.i);
+  if(!Number.isNaN(i)) openDetail(el.dataset.d, i);
+});
+
+/* 侧栏计数 */
+['home','pcNew','pcHot','pcRank','pcTrainer','pcMod','mNew','mEvent','mPlay'].forEach(k=>{
+  const el=document.getElementById('c-'+k);
+  if(!el) return;
+  if(k === 'home'){ el.textContent = heroItems().length; return; }
+  /* ★v10：排行榜页摆的是「4 个分榜」，侧栏计数就该是**榜上实际行数**。
+     继续显示已弃用的 pcRank 池（80 条）会与页面对不上。 */
+  if(k === 'pcRank'){
+    el.textContent = RANK_BOARDS.reduce((n,b)=>{
+      const src = D[b.tab] || [];
+      return n + Math.min(b.top, src.filter(b.has).length);
+    }, 0);
+    return;
+  }
+  el.textContent = (D[k]||[]).length;
+});
+
+document.querySelectorAll('.nav a').forEach(a=>{
+  a.addEventListener('click', e=>{ e.preventDefault(); goTab(a.dataset.tab); });
+});
+
+/* ===== ★v13 在线数据更新（用户 2026-10-15 拍板）=============================
+   用户口径：「exe 里的数据，启动时从线上拉最新的」。
+
+   策略（网络与离线的取舍）：
+     ① 首屏**先用内置 data.js 渲染** —— 快，且断网也能看；
+     ② 再**异步**拉线上最新 data.js；
+     ③ 仅当线上的 `meta.builtAt` **比内置新**时才替换数据源并重渲染
+        —— 重渲染只重建 `#main`，当前 Tab / 搜索词 / 筛选 / 排序都在全局变量里，**状态不丢**；
+     ④ 任何异常（断网、404、JSON 坏）一律**静默回落内置快照**，绝不白屏。
+
+   取数通道：Electron 壳里走 `window.__SHELL_FETCH__`（主进程代取，天然绕开 file:// 的 CORS）；
+             浏览器里走普通 fetch（线上部署时与 index.html 同域，不受 CORS 限制）。 */
+const REMOTE_DATA_URL = 'https://game-intel-client.app.workbuddy.host/data.js';
+
+/* 顶部「数据快照」那一行的轻提示：复用既有 .svc 元素，4 秒后还原，不新增 DOM 结构 */
+function svcFlash(msg){
+  const el = document.querySelector('.svc span');
+  if(!el) return;
+  const old = el.innerHTML;
+  el.innerHTML = msg;
+  setTimeout(function(){ el.innerHTML = old; }, 4000);
+}
+
+async function refreshFromRemote(){
+  try{
+    let text = null;
+    if(typeof window.__SHELL_FETCH__ === 'function'){
+      text = await window.__SHELL_FETCH__(REMOTE_DATA_URL);            /* Electron 壳 */
+    }else{
+      const r = await fetch(REMOTE_DATA_URL + '?t=' + Date.now(), { cache:'no-store' });
+      if(r.ok) text = await r.text();                                   /* 浏览器 */
+    }
+    if(!text) return;
+
+    /* data.js 是 `window.__DEMO_DATA__ = {…};`，取首尾大括号当成 JSON 解析 */
+    const i = text.indexOf('{'), j = text.lastIndexOf('}');
+    if(i < 0 || j <= i) return;
+    const nd = JSON.parse(text.slice(i, j + 1));
+    if(!nd || !nd.meta || !nd.meta.builtAt) return;
+
+    const oldT = (D.meta && D.meta.builtAt) || '';
+    if(String(nd.meta.builtAt) <= String(oldT)) return;   /* 不比内置新 ⇒ 什么都不做 */
+
+    D = nd;
+    T = nd.totals || {};
+    window.__DEMO_DATA__ = D;
+    const b = document.getElementById('builtAt');
+    if(b) b.textContent = nd.meta.builtAt;
+    render();
+    svcFlash('数据已更新 · ' + nd.meta.builtAt);
+  }catch(e){
+    /* 网络异常 ⇒ 静默沿用内置快照（离线可用是本设计的硬要求） */
+  }
+}
+
+/* ★v8：默认落地在首页 */
+resetState('home');
+render();
+refreshFromRemote();   /* ★v13：不 await —— 绝不阻塞首屏 */
+</script>
+</body>
+</html>

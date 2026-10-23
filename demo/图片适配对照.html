@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<title>端游卡片图片适配 · 四档对照</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#fff; --txt:#1c2333; --sub:#667085; --line:#e4e8f0;
+    --accent:#1e4ed8; --warn:#b45309; --warnbg:#fff8ed; --ok:#12a150; --okbg:#eefaf3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;padding:22px 26px 60px}
+  h1{font-size:19px;margin:0 0 6px}
+  .lead{color:var(--sub);font-size:12.5px;margin-bottom:18px}
+  .lead b{color:var(--txt)}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:18px}
+  .phead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .phead h2{font-size:14.5px;margin:0}
+  .badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;border:1px solid}
+  .b-cur{background:var(--okbg);border-color:#bfe8d2;color:var(--ok)}
+  .b-old{background:#fdecec;border-color:#f6c9c9;color:#c0392b}
+  .b-alt{background:#eef4ff;border-color:#c9d9f7;color:var(--accent)}
+  .pdesc{color:var(--sub);font-size:12px;margin:6px 0 13px}
+  .pdesc code{background:#f2f4f9;padding:1px 5px;border-radius:4px;color:#334155}
+  .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .it{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+  .cap{font-size:11px;color:var(--sub);padding:5px 8px;display:flex;justify-content:space-between;gap:6px;border-top:1px solid var(--line)}
+  .cap b{color:var(--txt);font-weight:650}
+  /* —— 四种容器 —— */
+  .fr16{aspect-ratio:16/9}
+  .fr32{aspect-ratio:3/2}
+  .box{position:relative;overflow:hidden;background:linear-gradient(160deg,#eef2f9 0%,#e2e9f6 100%)}
+  .box img{position:absolute;inset:0;width:100%;height:100%;display:block}
+  /* A 旧：contain + 同图模糊底 */
+  .A .bgf{filter:blur(16px) saturate(1.2);opacity:.55;transform:scale(1.24)}
+  .A .fg{object-fit:contain;z-index:1}
+  /* B 工作台小卡：contain + 浅灰衬底 */
+  .B .box{background:#f1f3f8}
+  .B .fg{object-fit:contain;z-index:1}
+  /* C / D：cover 满幅 */
+  .C .fg,.D .fg{object-fit:cover;object-position:center}
+  .tag1{position:absolute;z-index:2;top:6px;left:6px;background:rgba(30,58,110,.86);color:#fff;font-size:10px;padding:1px 6px;border-radius:5px;font-weight:600}
+  .src{position:absolute;z-index:2;bottom:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;padding:1px 6px;border-radius:5px}
+  .note{background:var(--warnbg);border:1px solid #fadfae;border-left:3px solid var(--warn);color:#7c4a03;border-radius:8px;padding:9px 12px;font-size:12px;margin-bottom:16px}
+  .note b{color:#5c3602}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+  th,td{border:1px solid var(--line);padding:6px 9px;text-align:left}
+  th{background:#f7f9fc;font-weight:650;color:var(--sub)}
+  td.num{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<h1>端游卡片图片适配 · 四档对照</h1>
+<div class="lead">
+  同一批<b>真实封面</b>（上排 4 张 = 52jidi / 小七 <b>1:1 方图</b>；下排 4 张 = Steam <b>460×215（2.14）宽图</b>），
+  在四种容器做法下的实际观感。<b>前两排是重点对照</b>，请直接看方图那一排的差别。
+</div>
+
+<div class="note">
+  <b>为什么会有这个取舍：</b>「卡位大小必须统一」和「图片不裁不切」在数学上无法同时满足 ——
+  卡位是固定比例，图源却有 <b>1:1</b> 与 <b>2.14</b> 两种。只能选一个偏向：
+  <b>偏统一</b> → 用 <code>cover</code> 满幅铺满（方图被纵向裁）；<b>偏完整</b> → 用 <code>contain</code> 完整显示（方图两侧留空）。
+</div>
+
+<!-- ============ A ============ -->
+<div class="panel A">
+  <div class="phead">
+    <h2>A · contain + 同图模糊铺底</h2>
+    <span class="badge b-old">v5–v6 旧做法 · 已废弃</span>
+  </div>
+  <div class="pdesc">
+    方图两侧用「同一张图放大 + <code>blur(16px)</code> + 55% 透明」填满。
+    实测问题：模糊底再像原图也只是一块<b>脏色条</b>，一屏里一半满幅一半脏条。
+    <b>你的反馈「很奇怪、未适配」指的就是它。</b>
+  </div>
+  <div class="row" id="rowA"></div>
+</div>
+
+<!-- ============ B ============ -->
+<div class="panel B">
+  <div class="phead">
+    <h2>B · contain + 浅灰衬底</h2>
+    <span class="badge b-alt">PC 工作台「同类小卡」的做法</span>
+  </div>
+  <div class="pdesc">
+    方图两侧用<b>纯浅灰</b>（<code>#f1f3f8</code>）衬底。脏条没有了，比 A 干净得多，
+    但方图依然只占 <b>56% 宽</b>，<b>仍然「没铺满」</b>。
+    工作台只用它来兜 106px 的小横滑卡 —— 那里太小，裁切会看不清。
+  </div>
+  <div class="row" id="rowB"></div>
+</div>
+
+<!-- ============ C ============ -->
+<div class="panel C">
+  <div class="phead">
+    <h2>C · 16:9 卡位 + cover 满幅</h2>
+    <span class="badge b-old">v7–v10 曾用 · 已被 v11 取代</span>
+  </div>
+  <div class="pdesc">
+    与 <b>PC 工作台主列表卡</b> <code>.row-card .th img{object-fit:cover}</code> 完全一致的做法。
+    满幅、整齐、一屏统一。代价见下表：<b>方图纵向裁掉 43.7%</b>（方图上的标题/logo 可能被切）。
+  </div>
+  <div class="row" id="rowC"></div>
+</div>
+
+<!-- ============ D ============ -->
+<div class="panel D">
+  <div class="phead">
+    <h2>D · 3:2 卡位 + cover 满幅</h2>
+    <span class="badge b-cur">★ 本 demo 现行（v11 · 混源 Tab）</span>
+  </div>
+  <div class="pdesc">
+    同样是 <code>cover</code> 满幅、同样统一，只把卡位从 16:9 拉高到 3:2。
+    <b>方图裁切量从 43.7% 降到 33.3%</b>；代价是宽图两侧多裁一点（16.9% → 29.9%），且卡片整体变高。
+  </div>
+  <div class="row" id="rowD"></div>
+</div>
+
+<div class="panel">
+  <h2 style="font-size:14.5px;margin:0 0 4px">裁切量实测（按真实像素算，不是估的）</h2>
+  <table>
+    <tr><th>做法</th><th>卡位比例</th><th>1:1 方图（215×215）</th><th>2.14 宽图（460×215）</th><th>观感</th></tr>
+    <tr><td>A contain + 模糊底</td><td class="num">1.778</td><td class="num">不裁，占 56% 宽</td><td class="num">不裁，上下各留 6px</td><td>两侧脏色条 ❌</td></tr>
+    <tr><td>B contain + 浅灰底</td><td class="num">1.778</td><td class="num">不裁，占 56% 宽</td><td class="num">不裁，上下各留 6px</td><td>干净但未铺满 ⚠️</td></tr>
+    <tr><td><b>C 16:9 + cover</b><br><span style="font-size:11px;color:#c0392b">v7–v10 曾用</span></td><td class="num">1.778</td><td class="num">纵裁 43.7%</td><td class="num">横裁 16.9%</td><td><b>满幅统一</b> ✅</td></tr>
+    <tr><td><b>D 3:2 + cover</b><br><span style="font-size:11px;color:#12a150">★ v11 现行</span></td><td class="num">1.500</td><td class="num">纵裁 33.3%</td><td class="num">横裁 29.9%</td><td>满幅，方图少裁些 ✅</td></tr>
+  </table>
+  <div class="pdesc" style="margin:12px 0 0">
+    <b>★ 2026-10-15（v11）已实际采纳 D，且不是全局一刀切：</b>
+    实测 651 张图的源比例只有两簇（1:1 方图 46% / 2.14 宽图 44%），据此做了两处调整 ——
+    ① 混源 Tab 的 <code>--th-ar</code> 由 16/9 改为 <b>3/2</b>（最狠单张裁切 43.8% → 33.3%）；
+    ② <b>pcNew 例外保留 16/9</b>（该页 60 张源比例区间是 2.14~2.14 纯宽图，16:9 对它已是最优 16.9%）。
+    卡片高度同步变化（126px → 149px），已复核「逐行定高」那套尺寸并重跑 jsdom 358/358。
+    全量实测与候选对照见 <code>../exe-preview/imgfit-review.html</code>。
+  </div>
+  <div class="pdesc" style="margin:10px 0 0;color:#b45309">
+    ⚠️ 本页引用的 8 张图来自 <b>远程 CDN</b>（机地 / 小七 / Steam），<b>离线打开会空白</b> ——
+    它是开发期对照页，不随 exe 交付。离线可视的版本见上面的实拍对照页。
+  </div>
+</div>
+
+<script>
+/* 真实封面样本：上排方图（52jidi ×3 + 小七 ×1），下排 Steam 宽图 ×4 */
+const SQ = [
+  ['https://img2.52jidi.com/topic/cover/id/1001565/sz/420', '机地', '1:1'],
+  ['https://img2.52jidi.com/topic/cover/id/1003185/sz/420', '机地', '1:1'],
+  ['https://img2.52jidi.com/topic/cover/id/1003649/sz/420', '机地', '1:1'],
+  ['https://image.x7sy.com/uploads/game_img/264_264/145727581_202608075575_264_264.png', '小七', '264×264']
+];
+const WD = [
+  ['https://shared.cdn.queniuqe.com/store_item_assets/steam/apps/1055540/header.jpg?t=1777758958', 'XD', '2.14'],
+  ['https://shared.cdn.queniuqe.com/store_item_assets/steam/apps/1063040/header.jpg?t=1670856335', 'XD', '2.14'],
+  ['https://shared.cdn.queniuqe.com/store_item_assets/steam/apps/271590/header.jpg?t=1765387725', 'XD', '2.14'],
+  ['https://shared.cdn.queniuqe.com/store_item_assets/steam/apps/1551360/header.jpg', 'XD', '2.14']
+];
+
+function cell(opt, url, src, ratio, frameCls){
+  const bg  = (opt === 'A') ? `<img class="bgf" src="${url}" alt="" referrerpolicy="no-referrer">` : '';
+  const tag = `<span class="tag1">${ratio}</span><span class="src">${src}</span>`;
+  return `<div class="it"><div class="box ${frameCls}">${bg}
+    <img class="fg" src="${url}" alt="" loading="lazy" referrerpolicy="no-referrer">${tag}</div>
+    <div class="cap"><b>${ratio === '1:1' || ratio === '264×264' ? '方图' : '宽图'}</b><span>${ratio}</span></div></div>`;
+}
+function fill(opt, frameCls){
+  const el = document.getElementById('row' + opt);
+  el.innerHTML = SQ.map(a => cell(opt, a[0], a[1], a[2], frameCls)).join('')
+               + WD.map(a => cell(opt, a[0], a[1], a[2], frameCls)).join('');
+}
+fill('A', 'fr16'); fill('B', 'fr16'); fill('C', 'fr16'); fill('D', 'fr32');
+</script>
+</body>
+</html>

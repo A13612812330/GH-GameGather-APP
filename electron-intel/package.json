@@ -1,0 +1,8 @@
+{
+  "name": "game-intel-client",
+  "productName": "GameIntel",
+  "version": "1.0.0-preview",
+  "private": true,
+  "description": "游戏情报客户端 · 便携版（静态页 + 在线数据更新）",
+  "main": "main.js"
+}

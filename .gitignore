@@ -1,0 +1,42 @@
+# ── 构建产物 ────────────────────────────────────────────
+# dist/ 是打包输出：620 MB，含整个 Electron 发行版与上游只读拷贝。
+# 需要成品请本地跑 `python electron/pack.py`（约 2~4 分钟）。
+/dist/
+
+# ── 依赖与第三方二进制 ──────────────────────────────────
+/electron/node_modules/
+# aria2c.exe 是 GPLv2 第三方二进制，不随仓库分发；打包脚本会从本机 vendor/ 取。
+/electron/vendor/
+__pycache__/
+/electron/__pycache__/
+
+# ── 探针缓存 / 抓取样本（体积大，可重跑生成）─────────────
+/demo/_imgcache/
+/demo/_shots/
+/demo/_ext_mods/
+/demo/_cp_out.txt
+/demo/_actfit_*.json
+
+# ── 版本回退点：v27 起由 git 历史承担 ───────────────────
+/demo/*.bak.html
+/demo/data.v8.bak.js
+
+# ── 本地过程目录（不属于交付物）─────────────────────────
+/_archive/
+/_audit/
+/_probe/
+/_demo_tmp/
+# 第三方站点实拍取证，仅本地留证，不对外分发
+/_ref/
+/_refs/
+
+# ── 实拍截图一律不入库（按 2026-10-23 决定）：shots / shots-after / shots-cand /
+#    shots-noreport / crops 全部排除，另有 35 MB / 77 张在 shots/ ─
+/exe-preview/shots*/
+/exe-preview/crops/
+
+# ── 杂项 ────────────────────────────────────────────────
+*.log
+/.wbapp_*.genie
+# 与本项目无关的修复单（属另一条线）
+/CODEX-FIX-*.md

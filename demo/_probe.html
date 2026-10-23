@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>probe</title></head>
+<body style="margin:0">
+<iframe id="f" src="index.html" style="width:1280px;height:900px;border:0"></iframe>
+<pre id="out" style="font:12px monospace">pending</pre>
+<script>
+/* 探针：在真实浏览器里加载 demo，统计每张图片的真实加载结果与自适应分支 */
+function probe(){
+  try{
+    const d = document.getElementById('f').contentDocument;
+    if(!d){ document.getElementById('out').textContent='ERR: no contentDocument'; return; }
+    const imgs=[...d.querySelectorAll('.cv img')];
+    const rows=imgs.map(i=>({
+      tail:(i.currentSrc||i.src||'').slice(-46),
+      w:i.naturalWidth, h:i.naturalHeight,
+      ratio: i.naturalHeight? +(i.naturalWidth/i.naturalHeight).toFixed(2) : 0,
+      complete:i.complete, fitc:i.classList.contains('fit-c'), ready:i.classList.contains('ready')
+    }));
+    const cards=d.querySelectorAll('#main .card');
+    const nv=d.querySelectorAll('.nav a');
+    const res={
+      navTabs: nv.length,
+      cards: cards.length,
+      imgTotal: rows.length,
+      imgLoaded: rows.filter(r=>r.complete && r.naturalWidth>0).length,
+      imgFailed: rows.filter(r=>r.complete && !r.naturalWidth).length,
+      fitContain: rows.filter(r=>r.fitc).length,
+      fitCover: rows.filter(r=>!r.fitc).length,
+      sample: rows.slice(0,14)
+    };
+    document.getElementById('out').textContent='PROBE_RESULT='+JSON.stringify(res,null,1);
+  }catch(e){ document.getElementById('out').textContent='ERR: '+e.message; }
+}
+setTimeout(probe, 9000);
+</script>
+</body></html>

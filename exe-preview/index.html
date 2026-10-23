@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GameIntel exe · 窗口预览（v24）</title>
+<style>
+:root{
+  --page:#f4f4f2; --card:#ffffff; --line:rgba(0,0,0,.10); --line2:rgba(0,0,0,.18);
+  --tx:#1c1c1a; --tx2:#5f5e5a; --tx3:#8a8983;
+  --app:#161616; --app2:#1f1f1f; --app3:#2a2a2a; --appline:rgba(255,255,255,.10);
+  --apptx:#e8e8e6; --apptx2:#9a9a97; --teal:#00d9c5;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--page);color:var(--tx);font:13px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;padding:28px 24px 64px}
+.wrap{max-width:1360px;margin:0 auto}
+h1{font-size:15px;font-weight:500;margin:0 0 6px}
+h2{font-size:14px;font-weight:500;margin:32px 0 10px}
+p{margin:0 0 10px}
+.mut{color:var(--tx2)}
+.mini{font-size:12px;color:var(--tx3)}
+.notice{background:#fff;border:.5px solid var(--line);border-radius:12px;padding:14px 16px;margin:14px 0 0}
+.notice b{font-weight:500}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:14px}
+.kv div{background:var(--card);border:.5px solid var(--line);border-radius:10px;padding:10px 12px}
+.kv .l{font-size:12px;color:var(--tx2);margin:0 0 2px}
+.kv .v{font-size:14px;font-weight:500;margin:0}
+
+/* ---- exe 窗口外壳（预览态） ---- */
+.frame{margin-top:14px;border-radius:12px;border:.5px solid var(--line2);overflow:hidden;background:var(--app)}
+.titlebar{height:38px;display:flex;align-items:center;gap:10px;padding:0 12px;background:#101010;border-bottom:1px solid var(--appline)}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block}
+.title{color:var(--apptx2);font-size:12px;margin-left:4px}
+.winctl{margin-left:auto;display:flex;gap:6px}
+.wbtn{width:26px;height:18px;border:1px solid var(--appline);border-radius:3px}
+.appbody{display:flex;height:640px}
+.side{width:196px;flex:0 0 196px;background:var(--app);border-right:1px solid var(--appline);padding:12px 10px;overflow:auto}
+.grp{font-size:11px;letter-spacing:.04em;color:#ffffff;font-weight:500;padding:12px 8px 6px;margin:0}
+.nav{display:block;width:100%;text-align:left;background:none;border:0;color:var(--apptx);font:12px/1.5 inherit;padding:6px 8px;border-radius:6px;cursor:pointer;position:relative}
+.nav:hover{background:var(--app2)}
+.nav[aria-current="true"]{background:var(--app3);box-shadow:inset 2px 0 0 var(--teal)}
+.nav .tag{float:right;font-size:10px;color:#062522;background:var(--teal);border-radius:3px;padding:0 4px;margin-top:2px}
+.view{flex:1 1 auto;background:#0d0d0d;overflow:hidden;position:relative}
+.view img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.viewcap{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(to top,rgba(0,0,0,.82),rgba(0,0,0,0));padding:22px 14px 10px;color:#e8e8e6;font-size:12px}
+
+/* ---- 画廊 ---- */
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:var(--card);border:.5px solid var(--line);border-radius:12px;overflow:hidden}
+.card .thumb{height:150px;background:#111;overflow:hidden}
+.card .thumb img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.card .meta{padding:10px 12px}
+.card .meta .t{font-size:13px;font-weight:500;margin:0 0 2px}
+.card .meta .s{font-size:11px;color:var(--tx3);word-break:break-all}
+.sec-note{font-size:12px;color:var(--tx2);margin:0 0 10px}
+table{border-collapse:collapse;width:100%;font-size:12px;background:#fff;border:.5px solid var(--line);border-radius:12px;overflow:hidden}
+th,td{text-align:left;padding:8px 10px;border-bottom:.5px solid var(--line);vertical-align:top}
+th{font-weight:500;color:var(--tx2);background:#fafaf9}
+td.mono{font-family:ui-monospace,Consolas,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GameIntel exe · 窗口预览（v24 · 2026-10-22）</h1>
+  <p class="mut">你要看的两件事都在这页里：<b>① exe 的窗口长什么样</b>（下方可点的窗口外壳），<b>② 每一个窗口</b>（15 个页面一个不落，全在画廊里）。</p>
+
+  <div class="notice">
+    <p><b>先说清真假</b>：窗口里显示的内容是<b>真实截图</b> —— demo 9 页用本机 Chrome 实拍（1440×900，深色默认主题），GameHub 6 页是对本机 <span class="mono">127.0.0.1:8123</span> 实时实拍。<br>
+    但<b>窗口外壳（标题栏 / 左侧导航 / 圆角边框）是照方案画出来的预览</b> —— exe 还没构建（等上游收口），所以外壳不是成品像素，而是「按 §四 的 15 页结构应长这样」。</p>
+  </div>
+
+  <div class="kv">
+    <div><p class="l">预览窗口尺寸</p><p class="v">1440 × 900</p></div>
+    <div><p class="l">一级导航</p><p class="v">demo 12 → <b>13 项</b>（v18）<br><span class="mini">新增「管理页 ↗」· 探到本机上游才显示</span></p></div>
+    <div><p class="l">demo 默认主题</p><p class="v">深色（中性灰 #161616）</p></div>
+    <div><p class="l">实拍张数</p><p class="v"><b>2（v24 成品 · 最新）</b><br>+ 2（v23）+ 1（v22）+ 2（v21）+ 2（v20）+ 2（v19）+ 6窗口/2合成（v18）+ 6（v17）+ 10（v16）+ 7（v15）</p></div>
+  </div>
+
+  <h2>★★★★★★★★★★★★★ v27（2026-10-23）—— <b>最新一版</b>：首页榜单<b>默认只露 Top 5</b>，其余折叠（可展开全部 12）</h2>
+  <p class="sec-note">
+    起因是 v26 落地后的副作用：首页此时已有 <b>26 张精选卡 + 48 行榜</b>，滚动明显变长，
+    而<b>榜首几条与上方精选本来就是同一批游戏</b>（同一个池子、同一套排序）。<br>
+    <b>① 只折叠、不删数据</b>：超出的 7 行<b>照常渲染</b>，只多挂一个
+    <span class="mono">.rb</span> 类默认隐藏 ⇒ DOM 里仍是 <b>48 行</b>，
+    「48 行」口径、深链页、既有断言全都不受影响。<br>
+    <b>② 展开/收起只切一个 class</b>，<b>不重渲染</b> —— 榜单落在页面最底部，
+    整页重渲染会把滚动位置拉回顶部，用户点一下就「跳走了」。<br>
+    <b>③ 深链页 <span class="mono">#pcRank</span> 不受影响</b>：<span class="mono">rankBoardsHTML()</span>
+    新增的是<b>可选参数</b> <span class="mono">{fold:5}</span>，首页传、深链页不传 ⇒ 那边仍是全量 12 行、无折叠按钮。<br>
+    <b>④ 展开状态按榜名记在内存里</b>（<span class="mono">RB_OPEN</span>），切走再回来仍是展开态；
+    刻意<b>不写 localStorage</b> —— 这是纯浏览偏好，重开回到「只看 Top 5」更贴合「快速扫一眼」的用途。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v27-rank.png" alt="v27 首页榜单折叠态：每榜 5 行 + 展开全部 12 条"></div>
+      <div class="meta"><p class="t">① 默认折叠态：每榜 5 行 + 「展开全部 12 条」</p>
+        <p class="s">四个榜等高，视觉上比 v26 的 12 行整齐得多。分节头副标题同步改成
+          <b>「默认各 Top 5（可展开全部 12）」</b>，不让用户猜还剩多少。</p>
+        <p class="s">按钮占满整行、居中、无背景 —— 它是一条<b>操作条</b>，不是卡片内容，
+          所以刻意不做成胶囊按钮。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v27-expand2.png" alt="v27 点「展开全部」后：该榜 12 行全展开，按钮变「收起（只显示 Top 5）」"></div>
+      <div class="meta"><p class="t">② 点「展开全部」后的真实状态（<b>走真实 click</b>）</p>
+        <p class="s">同一按钮自反：文案变<b>「收起（只显示 Top 5）」</b>。这张是 Electron 真实窗口里
+          <span class="mono">.rbmore.click()</span> 点出来的，不是手改 CSS 摆的样子。</p>
+        <p class="s">上图只展开了上面两个榜（脚本把 4 个都点了，截图取的是首屏），
+          所以下半部分仍是 5 行 —— 顺手也验证了<b>四个榜各自独立折叠</b>，不是全局开关。</p></div>
+    </div>
+  </div>
+
+  <h2>★★★★★★★★★★★★ v26（2026-10-23）：排行榜<b>下沉到首页底部</b>，侧栏独立入口<b>移除</b></h2>
+  <p class="sec-note">
+    用户口径一句话：<b>「排行榜放在首页下（移除排行榜的独立入口）」</b>。<br>
+    <b>① 榜整块搬到首页底部</b>：四个分榜（PC 新游 / PC 热游 / 手机新游 / 手机热游）原样复用
+    <span class="mono">RANK_BOARDS</span> 与 <span class="mono">rankBoardsHTML()</span>，<b>零重写</b> ——
+    所以每行的 <span class="mono">data-d</span> 天然指向正确的 Tab，点榜行 = 点那个 Tab 的同一条，弹窗取数不会错位。<br>
+    <b>② 侧栏 12 → 11 项</b>：只摘掉「🏆 排行榜」这一条入口。<br>
+    <b>③ 页面本身刻意保留</b>：<span class="mono">TABS.pcRank</span> 与 render 的 rankBoard 分支都还在 ——
+    它们是 <span class="mono">goTab('pcRank')</span> 的落点（深链、旧断言、口径说明块都指着它），
+    删掉只会让这些调用<b>静默变成 no-op</b>。<b>入口消失 ≠ 页面消失</b>，这是这一版最重要的一条设计决定。<br>
+    <b>④ 顺手守了一个「半拆」陷阱</b>：入口删了，<span class="mono">#c-pcRank</span> 这个计数位也必须一起消失，
+    否则就是「导航没了、计数还挂着」。断言里显式验了它<b>确实不存在</b>。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v26-rank.png" alt="v26 首页底部排行榜：四个分榜 2×2 排布，深色主题"></div>
+      <div class="meta"><p class="t">① 首页底部的排行榜（深色）</p>
+        <p class="s">四个榜 <b>2×2</b> 排布、各 Top 12，共 <b>48 行</b> —— 与原来独立页的口径完全一致，
+          没有缩水成「首页只放 Top 5」。宽窗口下两列并排，窄窗口自动落成单列。</p>
+        <p class="s">左侧侧栏「PC 端游」组现在只剩 <b>新游 / 热游 / 修改器 / MOD</b> 四项，排行榜那条已经没有了。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v26-home-full.png" alt="v26 首页整页：轮播 + 三块精选 + 底部排行榜"></div>
+      <div class="meta"><p class="t">② 首页整页节奏（轮播 → 精选 ×3 → 排行榜）</p>
+        <p class="s">榜单接在「手游新游 · 精选」之后，<b>分节头样式与大图/精选块统一</b>（同一个
+          <span class="mono">.hsechd</span>），所以看起来是「首页的第四块」，不是塞进来的外来模块。</p>
+        <p class="s">★ 分节头<b>刻意不放「查看全部」</b>：榜的独立入口已经删了，放一个
+          <span class="mono">data-go</span> 按钮就是把用户送回一个无入口的页面。断言里也守着这一条。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v26-rank-light.png" alt="v26 浅色主题下的首页排行榜"></div>
+      <div class="meta"><p class="t">③ 浅色主题（未单独调色）</p>
+        <p class="s">榜单块全部吃同一套 token，浅色下自动跟随 —— 这版<b>一行浅色专用样式都没写</b>。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v26-exe-rank.png" alt="v26 成品 exe 窗口：滚到首页底部即排行榜"></div>
+      <div class="meta"><p class="t">④ 成品 exe 窗口（1440×900 真渲染，滚到底）</p>
+        <p class="s">这是<b>桌面客户端形态</b>：侧栏带计数隐藏、右上为系统窗口按钮、数据来自本机实时库
+          （所以榜上的数值与 CDP 快照截图不完全一样，属正常）。</p>
+        <p class="s">★ 一屏只能看到第二排的两个榜（手机新游 / 手机热游）—— 4 榜 × 12 行本来就超过一屏高，
+          这是内容体量的必然结果，不是布局问题。</p></div>
+    </div>
+  </div>
+  <p><b>v26 验证</b>：页面断言 <b>785/785</b>（v25 是 778；净 <b>+7</b>：新增 5 条 v26 断言 + 2 条结构断言）·
+    壳契约 <b>73/73</b> · 引擎 <b>27/27</b> · 打包 <b>0 跳过</b>、包内 <span class="mono">intel/index.html</span> 与本地逐字节一致。<br>
+    <b>改判据而非放宽判据</b>：原来「首页三块精选」数的是 <span class="mono">.hsec</span> 长度 === 3 ——
+    加了第 4 块榜之后它会无条件变红，所以改成数 <span class="mono">.hseclist</span>（精选块的标志），
+    <b>精选仍然必须是 3 块</b>，判据没松。</p>
+
+  <h2>★★★★★★★★★★★ v25（2026-10-23）—— <b>上一版</b>：视觉重制（参考 games.gg）：深蓝黑色板 · 圆角级差 · 卡片上浮 · 胶囊 +N 折叠</h2>
+  <p class="sec-note">
+    用户先给了一个参考站 <span class="mono">https://games.gg/zh-CN/games/</span> 问「有无参考作用」，
+    看过对比后拍板<b>「前端样式和 UI 都不错，能否优化我们的 app」</b>。<br>
+    <b>① 色板换掉</b>：v9 起深色一直是对齐 TapTap 的中性灰（<span class="mono">#161616</span>），
+    这次换成 games.gg 的 <b>slate 冷色阶</b>——底 <span class="mono">#060d17</span>、面板 <span class="mono">#101828</span>、
+    主色由青绿 <span class="mono">#00d9c5</span> 换成品牌春绿 <span class="mono">#23db8c</span>。
+    <b>深色外观只有一处来源</b>（<span class="mono">html[data-theme="dark"]</span> 的 token 块），全仓 0 处第二套硬编码 ⇒ 改一处即全站生效。<br>
+    <b>② 圆角收敛</b>：v24 及以前散着 <b>10 种</b> ad-hoc 圆角（2/3/4/5/6/7/8/9/10/12px），同类组件取值不统一。
+    现在收敛成 <b>6 级级差</b>（4/6/8/10/12/16），<b>93 处</b>全部走变量，游戏卡取最大的 16px。<br>
+    <b>③ 卡片上浮</b>：<b>推翻了 v16G 的一条口径</b>。v16G 写的是「客户端只用描边、不用位移，因为位移会让网格抖」——
+    这个理由其实<b>不成立</b>：<span class="mono">transform</span> 走合成层、不触发重排，会抖的是改 margin/height。
+    现在改成「描边为主信号 + 上浮 4px 为次信号」（参考站是 8px，我们用 4px 更克制）。<br>
+    <b>④ 胶囊 +N 折叠</b>：<span class="mono">.cmeta</span> 是 <span class="mono">nowrap + overflow:hidden</span>，
+    放不下的标签<b>一直被静默裁掉</b>，用户只看到「标签少了几个」却不知道还有内容（v17 只能用「把重要的排最前」来规避）。
+    现在放不下的收成 <span class="mono">+N</span>（虚描边 + 主色字），悬停列出被折叠的文案。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v25-hot.png" alt="v25 成品窗口实拍：PC 热游页，深蓝黑底 + 品牌绿 + 16px 圆角卡"></div>
+      <div class="meta"><p class="t">① 成品窗口（1440×900 真实渲染）</p>
+        <p class="s">深蓝黑底 + 春绿主色 + 16px 圆角卡。注意右上 <b>9.4 / 8.7</b> 评分角标、左上来源胶囊的位置都没动 ——
+          这次是<b>纯视觉层</b>改动，布局与信息架构一行没碰。</p>
+        <p class="s">★ 实拍里能直接看出折叠：剑星那张卡是 <span class="mono">动作 · 热度35万 · 🧩190 · +1</span>；
+          「+1」就是被收起来的第 4 个标签，改前它是<b>被直接裁掉</b>的。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v25-detail.png" alt="v25 详情弹窗：全部走同一套 token，无需单独调"></div>
+      <div class="meta"><p class="t">② 详情弹窗（走真实点击路径打开）</p>
+        <p class="s">弹窗<b>没有单独调色</b>，全部吃同一套 token ⇒ 换色板自动跟着变。
+          KV 小卡 <span class="mono">--soft</span>、评分底 <span class="mono">--raise</span>、CTA 绿底深字
+          （<span class="mono">--on-accent</span> 特意用深墨绿 <span class="mono">#04170e</span> 而非白字 —— 亮绿底上白字对比不足）。</p>
+        <p class="s">★ 探针这次<b>走的是用户真实路径</b>（<span class="mono">.card.click()</span>），不是直接调
+          <span class="mono">openDetail()</span> —— v21 那次就是探针绕过真实入口，导致「管理页跳转不是管理页」长期没被发现。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v25-home.png" alt="v25 首页：hero 大卡 + 右侧竖排小卡 + 五列榜单"></div>
+      <div class="meta"><p class="t">③ 首页</p>
+        <p class="s">hero 大卡的椭圆指示点、右侧两张竖排小卡、下方五列「PC 新游 · 精选」全部沿用原版式，
+          只是圆角与配色跟着级差走。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v25-light.png" alt="v25 浅色主题：色板一格未动，只吃到圆角级差"></div>
+      <div class="meta"><p class="t">④ 浅色主题：色板一格未动</p>
+        <p class="s">这次只加深色。浅色 <span class="mono">:root</span> 的 <span class="mono">--bg:#f4f6fb</span>
+          等值<b>全部保留</b>（有断言盯着），所以浅色只吃到「圆角变大 + 悬停上浮 + +N 折叠」三样。
+          <b>零配色退化</b>。</p></div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>★ 明确<b>没做</b>的一件事：卡片改竖版 6/9（用户选项里选的「列表竖版」）—— 被数据否掉了。</b></p>
+    <p>用项目里既有的 <b>651 张真实图片</b>比例数据集（<span class="mono">_probe/imgfit.json</span>）逐张代入试算，
+      封面容器改成 6/9 竖版后的裁切率：</p>
+    <p class="mono" style="font-size:11.5px;line-height:1.7">
+      &nbsp;&nbsp;16:9&nbsp;&nbsp;均值 27.7% / 最狠 43.8%<br>
+      &nbsp;&nbsp;3:2&nbsp;&nbsp;&nbsp;均值 30.1% / 最狠 <b>33.3%</b>&nbsp;&nbsp;← 现用值<br>
+      &nbsp;&nbsp;<b>6:9 竖版&nbsp;&nbsp;均值 51.7% / 最狠 68.8%</b>&nbsp;&nbsp;← 用户选项<br>
+      &nbsp;&nbsp;3:4 竖版&nbsp;&nbsp;均值 45.7% / 最狠 64.9%
+    </p>
+    <p>根因：我们源的图<b>只有两簇</b> —— 1:1 方图 46%、2.14 宽图 44%（v11 实测），
+      <b>本来就没有竖图</b>。竖容器裁 2.14 宽图只剩 31% 可见，最狠一张要裁掉近七成。
+      这正是 v11 用户抱怨过的「图片未适配，很奇怪」。</p>
+    <p>参考站能用竖版，是因为它的封面本来就是 Steam 竖版头图（600×900）；<b>图源不同，比例不能照搬</b>。
+      所以这条按数据否决，其余四条照做。</p>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>v25 验证</b>：页面断言 <b>778/778</b>（新增 7 条，含 2 条<b>反证型</b>：
+      「全仓无 4~16px 裸圆角残留」+「foldMeta 必须用 clientWidth 守卫」）·
+      壳契约 <b>73/73</b> · 引擎 <b>27/27</b> · 深色色板对比度 <b>14/14 合格</b>（最低 6.30，WCAG AA 阈值 4.5/3.0）· 打包 <b>0 跳过</b>。</p>
+    <p>⚠️ 边界：色值是<b>深色专属</b>；浅色主题按「保持现状」不动，只吃到圆角与折叠。
+      <span class="mono">foldMeta</span> 在 jsdom（<span class="mono">clientWidth</span> 恒 0）里天然不生效 ——
+      这是刻意保留的性质，否则会改动卡片里 pill 的个数、把一堆既有断言打成假红。</p>
+  </div>
+
+  <h2>★★★★★★★★★★ v24（2026-10-22）—— <b>上一版</b>：下载任务<b>持久化</b> + 与引擎<b>对账</b>（N-36）</h2>
+  <p class="sec-note">
+    上一轮留的尾巴：任务表只在内存 ⇒ **重启就空**，而 aria2 的 session 是存盘的（引擎记得、界面忘了）。用户说「可以，优化」。<br>
+    <b>存的什么</b>：<span class="mono">localStorage</span> 的 <span class="mono">gi-dljobs</span>（主题、OpenList 配置都存这儿，已证明
+    <span class="mono">file://</span> 下能持久；不新增 IPC，浏览器 demo 也能用），上限 200 条。<br>
+    <b>什么时候写</b>：<b>只在状态变化时</b>（<span class="mono">dlJobTouch</span> 比对 <span class="mono">state</span>）——
+    一次下载会推几十次进度事件，每次都 <span class="mono">JSON.stringify</span> 整表纯属自残。<br>
+    <b>读回来之后必须对账</b>：引擎才是真相。三种情况分别处理（见下）。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v24-b.png" alt="v24 重启后：已完成保留、孤儿任务被如实标成失败"></div>
+      <div class="meta"><p class="t">重启之后：该留的留、该认错的认错</p>
+        <p class="s">这是**全新进程**、脚本里没有添加任何任务的实拍。<span class="mono">保留测试.bin</span> 仍是「已完成 10 B/10 B」；
+          <span class="mono">孤儿任务.bin</span> 被标成 <b>失败</b>，并写明
+          「<b>重启后未在引擎中找到该任务（可能已被清理）</b>」+ 重试 / 移除。</p>
+        <p class="s">★ 这条是本轮最要紧的诚实性判据：**界面上有、引擎里没有**的任务，
+          <b>不能假装还在下</b>（那会显示一个永远不动、还带进度条的假任务）。宁可标失败让你重试。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v23-dl.png" alt="任务列表（v23 精简后的版式）"></div>
+      <div class="meta"><p class="t">对账的三种情况</p>
+        <p class="s">① 引擎有、界面有 ⇒ 用引擎的 state / got / total / dest 覆盖，并记下 <b>gid</b>
+          （移除时要传它 —— 重启后主进程的 <span class="mono">gidAlias</span> 是空的，传页面 id 删不掉引擎里那条）。<br>
+          ② 引擎有、界面没有 ⇒ 补一条（可能是上次运行留下的）。<br>
+          ③ 界面有、引擎没有 ⇒ 标 fail + 写明原因（见左图）。</p>
+        <p class="s">★ 实拍抓到的真 bug：对账一开始挂在 <span class="mono">renderDownloads()</span> 末尾判
+          <span class="mono">state==='ready'</span>，但渲染发生时 probe 才刚发起、状态还是 <span class="mono">'probing'</span>
+          ⇒ <b>那次判断永远为假，对账一次都没跑过</b>（dump 出 <span class="mono">RECON=false</span> 才发现）。
+          已挪到 <span class="mono">dlEngineProbe</span> 判完状态之后。</p></div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>v24 验证</b>：页面断言 <b>770/770</b>（§27 新增 10 条，含一条<b>行为级</b>：同状态连打 3 次只写 1 次）·
+      壳契约 <b>73/73</b> · 引擎 27/27 · 打包 <b>0 跳过</b> · 包内与本地逐字节一致。</p>
+    <p><b>两次启动真验证</b>：① 写入轮加两条 → 关闭；② 全新进程打开 ⇒ 两条都在，且孤儿任务被判失败。
+      <b>测试数据已清空</b>（<span class="mono">LS=[]</span>），没留在你的应用里。</p>
+    <p>⚠️ 边界：<span class="mono">localStorage</span> 存的是**界面记录**，不是下载数据；真正的续传仍靠 aria2 的
+      <span class="mono">session</span> 文件。「清理」只清记录，不动已落盘的文件。</p>
+  </div>
+
+  <h2>★★★★★★★★★ v23（2026-10-22）—— <b>上一版</b>：下载管理<b>精简</b>（6 块 → 3 块）+ 历史可看 / 可删</h2>
+  <p class="sec-note">
+    用户两条：「现在的下载管理有点复杂，精简下」「历史为什么不能删，或者查看」。<br>
+    <b>① 精简</b>：这页原来有 <b>6 个区块</b>（引擎卡 / 磁力卡 / 任务列表 / 分页 / 上游卡 / 网盘配置卡）
+    + 页尾 <b>5 段实现说明</b>，实测要滚两屏。现在主区只剩
+    <b>磁力入口（一行）+ 任务列表 + 分页</b>；引擎 / 上游 / 网盘三张卡收进<b>底部一个折叠区</b>，
+    而<b>折叠头本身就是状态条</b>（引擎版本、速度、活动数不点开也看得见）；页尾那 5 段说明也收进折叠（<b>一字未删</b>）。<br>
+    <b>② 历史</b>：分两个"历史"，结论不一样 ——
+    <b>下载任务</b>（我们自己的）：每条已完成/失败都能<b>单独「移除」</b>，还能「复制路径」；
+    顺带修了个真 bug：改前「清空已完成」会把 <span class="mono">manual</span>（需你手动转存、身上带着分享链的）也一起清掉 = <b>把你还没处理的线索删了</b>。
+    <b>解压历史</b>（上游的）：现在每行可<b>「打开」</b>（走上游 <span class="mono">POST /api/extract/open</span>），
+    但<b>不能删</b> —— 上游整个服务端 <b>0 条 DELETE 路由</b>，我们只读它。<b>不假装能删。</b>
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v23-dl.png" alt="v23 精简后的下载管理：磁力一行 + 任务列表 + 折叠状态条"></div>
+      <div class="meta"><p class="t">① 精简后：一屏装得下</p>
+        <p class="s">从上到下：<b>磁力链任务</b>（一行）→ <b>任务列表</b> → <b>分页</b> →
+          <b>一条折叠状态条</b>「● 下载引擎就绪 aria2 1.37.0 · 0 B/s · 活动 0 · 等待 0」→ 「▸ 关于数据来源与实现」。
+          任务行右侧：打开网盘 / 打开文件 / 所在文件夹 / <b>复制路径</b> / <b>移除</b>。</p>
+        <p class="s">★ 折叠态记在 <span class="mono">DLSET_OPEN</span> 里，不是交给 <span class="mono">&lt;details&gt;</span> 自己保留 ——
+          这页会因为「翻页 / 清空 / 探测完成」整块重渲染，不记的话每次都被收起。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v23-fold.png" alt="v23 展开折叠区：引擎 / 上游 / 解压历史（可打开）/ 网盘配置"></div>
+      <div class="meta"><p class="t">② 点开后：三张卡都在，且解压历史每行多了「打开」</p>
+        <p class="s">折叠区里依次是 <b>下载引擎</b>（含「重新检测」）· <b>上游服务</b>（19,764 条 / 35 页 / 上限 433）·
+          <b>解压历史</b>（最近 6 条 / 共 200 条，<b>每行右侧「打开」</b>）· <b>网盘直链（OpenList）</b>配置。</p>
+        <p class="s">★ 历史下面那句是**如实说明**：「这些记录是上游落盘的（<span class="mono">_下载历史.json</span>，最多 200 条，满了自动挤掉最老的）。
+          上游没有删除接口（整个服务端 0 条 DELETE 路由），所以这里只能看、不能删 —— 我们不假装能删。」</p>
+        <p class="s">★ 另一个细节：上游 <span class="mono">/api/extract/open</span> 源码里写死「<b>只允许打开解压目录内</b>的路径」，
+          所以很多历史条目会被 400 拒。被拒时<b>不静默</b>：复制路径到剪贴板 + 贴上游原话，你至少能自己粘到资源管理器。</p></div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>v23 验证</b>：页面断言 <b>760/760</b>（§26 新增 10 条）· 壳契约 <b>73/73</b> · 引擎 27/27 ·
+      打包 <b>0 跳过</b> · 包内与本地逐字节一致 · 两张实拍首次命中。</p>
+    <p>⚠️ 改结构时有 <b>3 条旧断言**故意**改写</b>（不是放宽）：配置块从「页尾平铺」变成「折叠区」、
+      引擎卡从「列表之前」变成「折叠头常驻」、委托选择器因新增 <span class="mono">data-*</span> 变长。
+      每条都在测试里写明了**为什么改**，并保留原来的核心诉求（位置仍在分页条之后、`olBind` 仍跟重渲染走、磁力入口仍在列表之前）。</p>
+  </div>
+
+  <h2>★★★★★★★★ v22（2026-10-22）—— <b>上一版</b>：网盘「转存 → 取直链 → 交给引擎」<b>整条链跑通</b></h2>
+  <p class="sec-note">
+    上一轮 v21 的结论是「网盘分享页没法直下，真路只剩 OpenList」。用户说「可以 先试试」⇒ 本轮把那条链**接通并实测**。<br>
+    <b>链路</b>：<span class="mono">add_offline_download</span>（转存）→ <span class="mono">fs/list</span>（轮询落盘，带
+    <span class="mono">refresh:true</span>）→ <span class="mono">fs/get</span>（取 <span class="mono">raw_url</span>）→
+    <span class="mono">SHELL.startDownload</span>（交给 aria2 下）。<br>
+    ★ <b>怎么验的</b>（这点必须说清楚）：真跑这条链需要「一个 OpenList 实例 + 你的网盘账号 + 对应驱动」，这三样我都没有。
+    所以我写了一个**只实现 3 个端点的本地 mock OpenList**，把「上游回什么形状」喂进来 —— 管路能不能走完、aria2 能不能真下下来，
+    这部分是**真测过的**；真实网盘那一段仍然要你的实例。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v22-chain.png" alt="v22 网盘链：转存-test123.bin 已完成 300KB/300KB"></div>
+      <div class="meta"><p class="t">整链实测：<b>转存-test123.bin · 已完成 · 300 KB / 300 KB</b></p>
+        <p class="s">这是**成品 exe** 的实拍。一次 <span class="mono">olChainToEngine('https://pan.quark.cn/s/test123', '赛博朋克2077')</span>
+          走完四步，任务落到「下载管理」并**真的下完**；磁盘上确认文件 <b>307,200 字节</b>（与 mock 源文件一致）。
+          底部的「网盘直链 (OpenList / AList)」卡显示 <b>● 已连接</b>（<span class="mono">127.0.0.1:5244</span>）。</p>
+        <p class="s">★ 三个诚实边界（代码里都写死了）：① 转存依赖<b>你的</b> OpenList + 驱动，我只验到管路；
+          ② 有些驱动要特定 UA/Cookie，OpenList 会给在 <span class="mono">data.header</span> —— 我们<b>原样透传</b>给 aria2（<span class="mono">--header</span>），不自己编；
+          ③ 拿不到 <span class="mono">raw_url</span> 就如实报「该驱动可能不支持直链」，不假装能下。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v21-res.png" alt="资源条目上的「转存并下载」按钮"></div>
+      <div class="meta"><p class="t">入口没变：还是资源行上那颗按钮，但现在会<b>一路下到底</b></p>
+        <p class="s">引擎就绪时按钮文案从「↪ 转存到网盘」变成「↪ <b>转存并下载</b>」；点一下就是四步链。
+          中途任何一步失败，界面贴的都是<b>上游原话</b>（HTTP 状态 / OpenList 的 code+message），不做「翻译成友好话术」。</p>
+        <p class="s">★ 另一个隐坑：轮询必须带 <span class="mono">refresh:true</span> —— 不带就会一直读 OpenList 的**缓存列表**，
+          永远等不到刚转存的文件（表现成「转存成功了但一直没动静」）。</p></div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>要真正跑起来，你这边还差什么</b></p>
+    <p>① 跑一个 <b>OpenList / AList</b> 实例（<span class="mono">http://127.0.0.1:5244</span> 是它默认端口）；
+      ② 在它后台配好对应的网盘驱动（夸克 / 百度 / 迅雷各自的登录态）；
+      ③ 到 App「下载管理」页那张网盘卡里填地址 + Token，点「连接测试」拿到真实存储列表，再勾上实验开关。<br>
+      这三步完成前，资源行上不会出现「转存并下载」按钮 —— <b>宁可没有按钮，也不给一个点了必然失败的按钮</b>。</p>
+    <p><b>v22 验证</b>：页面断言 <b>748/748</b>（§25 新增 8 条）· 壳契约 <b>73/73</b>（+3：header 透传与数组归一化）·
+      引擎 27/27 · 打包 <b>0 跳过</b> · 包内三件套与本地逐字节一致 · 整链在成品里**两次复验**（第二次先删文件再下，落盘 307,200 B）。</p>
+  </div>
+
+  <h2>★★★★★★★ v21（2026-10-22）—— <b>上一版</b>：三个真实问题的修复（资源取数 / 详情等待 / 管理页地址）</h2>
+  <p class="sec-note">
+    用户报的四条，逐条查了实测数据再动手：<br>
+    <b>① 网页有资源、exe 没有</b> → 根因是<b>取数方式不同</b>：上游内部索引键是
+    <span class="mono">L:&lt;libId&gt;</span>（实测 <span class="mono">L:xd-191</span> → mod <b>717</b> 条 / <b>5 ms</b>），
+    我们却在<b>按游戏名模糊匹配</b>（实测 trainers：按名 <b>3</b> 条、按键 <b>22</b> 条）。
+    ⇒ 改成<b>精确键优先、按名兜底</b>。<br>
+    <b>② 详情慢</b> → 量化后是两个数：<span class="mono">/api/detail/merged</span> 只要 <b>1.4 s</b>（jidi 源），
+    慢的是 <span class="mono">/api/download?url=</span> —— <b>8.1 s</b>（上游要跟随 302 去抓源站页）。
+    ⇒ 精确键让另外三栏从「按名查」变成 <b>5~150 ms</b>；「本体」那栏给明确的等待说明（约 5~10 秒 + 可先看别的）。<br>
+    <b>③ 网盘下载</b> → 见下方结论：<b>上游给的全是分享页，直接下不可能</b>。<br>
+    <b>④ 管理页不是管理页</b> → 上游 <span class="mono">public/</span> 下 <span class="mono">index.html</span> 是工作台、
+    <span class="mono">admin.html</span> 才是管理后台，而默认值写的是前者 ⇒ 改了默认值，并把<b>实拍模式也改成走默认值</b>
+    （之前实拍写死 <span class="mono">/index.html</span>，恰好掩盖了这个 bug）。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v21-res.png" alt="v21 资源块：精确键之后 Mod 200 / 修改器 24 / 存档 104"></div>
+      <div class="meta"><p class="t">① 资源块：<b>Mod 0 → 200</b>，修改器 4 → 24，存档 1 → 104</p>
+        <p class="s">这是同一款《赛博朋克2077》在<b>成品 exe</b> 里的实拍。修前该游戏的 Mod 栏是 <b>0</b>（按名匹配没命中），
+          修后走 <span class="mono">/api/res/items?cat=mod&amp;key=L:xd-191</span> 拿到 <b>200</b>（接口真值 717，渲染截到 200）。
+          修改器与存档同样从个位数变成 <b>24 / 104</b>。</p>
+        <p class="s">★ 顺带证实了③：每条资源的按钮都是「<b>迅雷下载 / 夸克网盘 / 百度网盘 / 原帖</b>」——
+          也就是说<b>上游一条直链都没有</b>。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v21-admin-admin.png" alt="v21 管理窗：真管理后台 admin.html#dash"></div>
+      <div class="meta"><p class="t">② 管理页终于开对：<span class="mono">/admin.html#dash</span></p>
+        <p class="s">实拍日志实测：<span class="mono">管理窗 url=http://127.0.0.1:8133/admin.html#dash · 动作条按钮=4</span>。
+          改前是 <span class="mono">/index.html</span>（工作台/情报站），所以用户点「管理页」看到的不是管理页。</p>
+        <p class="s">⚠️ 这里踩的坑值得记：<b>实拍模式里写死了 <span class="mono">createAdminWindow('/index.html')</span></b>，
+          和用户真实点击走的不是同一条路 ⇒ 截图一直是"对"的，bug 一直没被发现。
+          已改成不传参数、走默认值 —— <b>探针必须走被测的那条路径</b>，否则测的是它自己。</p></div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>③ 网盘下载：能不能做到？—— 直接下不能，两条真路可以</b></p>
+    <p>实测 <span class="mono">/api/download?url=</span>（jidi 源）返回 <b>192 条</b>，字段是
+      <span class="mono">{server:"夸克网盘|迅雷网盘|百度网盘", real:"https://pan.quark.cn/s/…"}</span> ——
+      <b>192/192 全是网盘分享页，零直链、零磁力</b>。aria2 打不开这类地址，这是协议层面的限制，不是没做。<br>
+      ⇒ 真能下载的只有两条：<b>(a) 你自建 OpenList/AList 转存出直链</b>（外挂已接好，实验开关默认关，需你部署）；
+      <b>(b) 交给本机网盘客户端</b>（现有的「复制链接 / 打开网盘」就是这条，稳定但需要人点两下）。
+      第三条「服务端替你做网盘解析」需要账号态与专有协议，既不可靠也有合规风险，不建议。</p>
+    <p><b>v21 验证</b>：页面断言 <b>740/740</b>（§24 新增 9 条，含精确键推导的<b>行为级</b>用例）·
+      壳契约 <b>70/70</b>（新增管理页默认值 + 正则未放松）· 打包 <b>0 跳过</b> · 包内三件套与本地<b>逐字节一致</b>。</p>
+  </div>
+
+  <h2>★★★★★★ v20（2026-10-22）—— <b>上一版</b>：借鉴迅雷游戏助手（Tab 记忆 · 6px 滚动条 · 斜切角 · 下载不睡 / 退出先问）</h2>
+  <p class="sec-note">
+    来历：用户丢来成品 <span class="mono">D:\XunleiGameAssistant</span> 让我逆向学习。用 <b>REA-Skill</b>
+    （<span class="mono">desktop-installer-static-unpack</span>）做了静态解剖，报告在
+    <span class="mono">REF-迅雷游戏助手-逆向分析.md</span>。<br>
+    它和我们的**根本差距**先说清：它的下载内核是<b>迅雷 P2SP SDK</b>（源站 + 候选 server + 候选 peer + DCDN
+    <b>四条资源链</b> + 索引秒传 + 账号 VIP 定速）—— 那是<b>资源池</b>的差距，不是代码能追的。
+    所以本轮只借鉴<b>我们能做且值得做</b>的六项。<br>
+    <b>① Tab 记忆</b>：每个侧栏页记住搜索词 / 筛选 / 排序 / 滚动位置，切走再切回<b>回到原处</b>；
+    再点当前页 = 回顶部但<b>不清筛选</b>（定位 ≠ 重置）。
+    <b>② 6px 滚动条</b>：宽度 10 → 6，补齐 track，颜色仍从 token 推导（两套主题自动跟随）。
+    <b>③ 斜切角</b>：用 <span class="mono">clip-path</span> 画，<b>不引入任何素材</b>。
+    <b>④ 桌面禁选中</b>（详情与输入框放开）。
+    <b>⑤ 下载期间阻止系统休眠</b>（<span class="mono">prevent-app-suspension</span>，屏幕照常可关）。
+    <b>⑥ 退出先问一句</b>（还在下载时原生确认，并如实告知「session 已保存、下次可续传」）。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v20-cards.png" alt="v20 下载页 · 三张面板卡的斜切角"></div>
+      <div class="meta"><p class="t">① 斜切角落在<b>看得见的地方</b>（三张面板卡右上角各切一角）</p>
+        <p class="s">这是本轮踩到并纠正的一个坑：一开始把斜切角也给了<b>详情抽屉</b>（<span class="mono">.dlg</span>），
+          但抽屉是<b>整屏高</b>，切掉的右上角正好落在<b>系统窗口按钮</b>那一带 ——
+          连拍两张<b>都看不出来</b>，还会压到右上角来源胶囊。
+          ⇒ 视觉语言必须放在「四角都在视野里」的元素上，否则等于没做（断言已锁住「别再给 .dlg 加」）。</p>
+        <p class="s">顺手记：滚动条 10→6px 后，颜色改用 <span class="mono">color-mix(... var(--txt) ...)</span> 推导，
+          深/浅两套主题自动跟随，<b>没有写死色值</b>。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v20-detail.png" alt="v20 详情抽屉（整屏高 ⇒ 斜切角看不见）"></div>
+      <div class="meta"><p class="t">② 反面样本：详情抽屉 —— 斜切角在这里<b>读不出来</b></p>
+        <p class="s">这张就是证据：抽屉占满整屏高，右上是窗口角。所以斜切角只保留在
+          <span class="mono">.olcard</span>（引擎卡 / 磁力卡 / 上游服务卡 / 网盘配置卡）。</p>
+        <p class="s">★ 该学它、但<b>我们这里不适用</b>的一条：迅雷的<b>「拖拽区让位」</b>（悬停头像菜单时收起拖拽区）。
+          我先以为我们顶栏按钮被拖拽区吃掉了，实测发现 <span class="mono">no-drag</span> 早就写全了
+          （<span class="mono">.topbar button/a/input</span> 多行选择器，我头一次 grep 只看到最后一行）——
+          <b>不是 bug，也没悬停菜单可让位</b>。已在断言里锁住防回归。</p></div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>v20 的验证</b>：页面断言 <b>731/731</b>（§23 新增 11 条，含一条<b>行为级</b>：切走再切回搜索词是否还在）·
+      壳契约 <b>68/68</b>（§⑥ 新增 8 条：休眠档位 / 活跃集合维护 / 取消时摘除 / 关窗拦截时机 / forceQuit 闸门）·
+      引擎 <b>27/27</b> · 打包 <b>0 跳过</b> · 包内四件套与本地<b>逐字节一致</b>。</p>
+    <p>⚠️ 仍未做：<b>进度「拉+推」双通道</b>（它窗口重建后靠 <span class="mono">get-progress</span> 兜底，我们没有）·
+      <b>下载独立浮窗</b>（它的 <span class="mono">download:progress</span> 推给专用 <span class="mono">progressWindow</span>）·
+      <b>完整性校验 / 下完自动安装 / 磁盘守卫</b> · <b>侧栏 12 项是否收敛</b>（要不要动信息架构，待拍板）。</p>
+  </div>
+
+  <h2>★★★★★ v19（2026-10-22）—— <b>上一版</b>：下载引擎<b>已接入</b>（aria2 1.37.0）· 管理接口就位（2 张窗口实拍）</h2>
+  <h2>★★★★★ v19（2026-10-22）—— <b>上一版</b>：下载引擎<b>已接入</b>（aria2 1.37.0）· 管理接口就位（2 张窗口实拍）</h2>
+  <p class="sec-note">
+    分两步做完：<b>先把契约「预留」</b>（接口定死、引擎未装），<b>再实装</b>（真起 aria2c + 回环 JSON-RPC）。<br>
+    <b>① 关联</b>：页面<b>只调一个</b> <span class="mono">startDownload</span> —— 主进程按「有没有引擎」决定后端。
+    进度事件形状与旧下载器<b>完全一致</b>，页面零改动；<span class="mono">gid ↔ 页面任务 id</span> 由主进程映射
+    （不映射的话页面收不到进度，会表现成「卡在 0%」）。<br>
+    <b>② 管理接口</b>：<span class="mono">dlList / dlRemove / dlClear / dlStats / dlOptions</span> 五个，全走 preload 白名单。<br>
+    <b>③ 安全边界</b>：RPC 只绑 <span class="mono">127.0.0.1</span> + 每次随机 secret + 禁止跨源；
+    secret 与 <span class="mono">dir</span> <b>永不进页面上下文</b>（页面改目录会被 <span class="mono">dir-locked</span> 明确拒绝）。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v19b-engine.png" alt="v19 下载后台 · 引擎就绪"></div>
+      <div class="meta"><p class="t">① 下载后台 —— 引擎<b>就绪</b>（aria2 1.37.0）</p>
+        <p class="s">徽标 <span class="mono">● 引擎就绪</span>，描述里给出<b>版本 + 实时统计</b>
+          （<span class="mono">当前 0 B/s · 活动 0 · 等待 0 · 已结束 0</span>，来自 <span class="mono">dlStats()</span>）。
+          下面就是磁力入口：粘贴 → 解析文件清单 → 选文件 → 开始下载。</p>
+        <p class="s">⚠️ 上一版这里写的是「未接入（预留）」—— 那版是<b>故意</b>的：契约先定、引擎后装。
+          本轮装上了，<b>同一个 IPC 自动变成就绪，页面一行没改</b>。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v19b-magnet.png" alt="v19 真磁力解析 · 可勾选文件清单"></div>
+      <div class="meta"><p class="t">② 真磁力链解析 —— 6 秒出<b>可勾选</b>的文件清单</p>
+        <p class="s">这是一条<b>真的</b> magnet（Debian 官方 ISO），不是示意图：徽标变
+          <span class="mono">已解析 1 个文件</span>，下面是 1 个文件 / 共 <b>756.0 MB</b>，
+          每行带勾选框 + 「开始下载选中的 1 个」+ <span class="mono">已选 1 / 1</span>。</p>
+        <p class="s">★ 预览<b>只取元数据、不下载正文</b>：实测踩到的坑是 RPC 的
+          <span class="mono">addUri</span> 不认 <span class="mono">bt-metadata-only</span>（那是<b>全局</b>选项）
+          ⇒ 它会把 756 MB 整包开下。所以改成<b>独立短命进程</b>取 <span class="mono">.torrent</span> 再解析，6 秒出清单。</p></div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>v19 的验证（全部真跑，不是估算）</b></p>
+    <p><b>引擎模块独立测试 27/27</b>（<span class="mono">electron/_t_aria2.js</span>，真起进程真下载）·
+      <b>壳契约 60/60</b>（<span class="mono">_t_shell.js</span>）· <b>页面断言 720/720</b>（<span class="mono">_t_demo.js</span>）。</p>
+    <p><b>成品 smoke 的关键一行</b>：<br>
+      <span class="mono">真下载结果 : {"r":{"ok":true,"engine":"aria2"},"last":{"id":"smoke2-…","state":"done","got":144,"total":144,"engine":"aria2"}}</span><br>
+      ⇒ 进度事件里回来的 id 是<b>页面自己传的那个</b>，这就是「关联」跑通的硬证据。</p>
+    <p><b>GPLv2 合规</b>：<span class="mono">vendor/aria2/</span> 里放了 <span class="mono">aria2c.exe</span>（sha256
+      <span class="mono">be2099c2…</span>）+ <span class="mono">COPYING</span>（GPLv2 全文）+
+      <span class="mono">SOURCE-OFFER.txt</span>（版本 / 官方下载页 / sha256 / 源码获取方式）。
+      独立进程 + 回环 JSON-RPC 属<b>聚合</b>，不使其余部分被 GPL 覆盖。</p>
+    <p>⚠️ 已知限制：<b>暂停 / 续传只对引擎里的任务有效</b>（内置单连下载器仍只有取消）；
+      <b>网盘分享页仍不做</b>（aria2 打不开这类页面）；反证打坏点尚未覆盖新增的 IPC。</p>
+  </div>
+  <h2>★★★★ v18（2026-10-16 晚）—— <b>上一版</b>：上游安全收口 + 实例标识 + 管理页独立窗口（6 张窗口实拍 + 2 张对照合成）</h2>
+  <p class="sec-note">
+    本轮由你截图里那句 <span class="mono">Invalid file descriptor to ICU data received.</span> 起头，做了四件事：<br>
+    <b>① 先把那个报错讲清</b> —— 它<b>不是 App 的 bug</b>，是 exe 被当成了「绿色单文件」（详见下面第 ⑨ 张的说明）；
+    <b>② 上游安全收口</b>（默认只听 <span class="mono">127.0.0.1</span>，不再 <span class="mono">0.0.0.0</span> 零鉴权裸奔）；
+    <b>③ 给上游加「实例标识」</b>（谁拉起的 / 哪个 pid / 听哪个口）；
+    <b>④ 工作台变成 App 的「管理页」</b> —— 你选的形态是 <b>独立窗口</b>（App 与管理页并存），
+    关联深度是 <b>双向（含回写）</b>。<br>
+    ★ <b>这是本项目第一次改上游</b>（此前铁律是「上游一律只读」）。按你的授权只做了
+    <b>三处语义 + 五个「只增不改」字段</b>；改前留了备份，改后 <span class="mono">node --check</span> + 副实例实测双分支，
+    <b>全程没动你正在用的那个 8123</b>。详见 <span class="mono">PACK-GameHub-exe.md §十七</span>。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v18-dualwindow.png" alt="v18 双窗同屏 · App 主窗 + 管理页独立窗口"></div>
+      <div class="meta"><p class="t">① 主窗 + 管理窗 <b>同时开着</b>（双窗对照 · 2227×994）</p>
+        <p class="s">左 = App 主窗（情报站，1440×900），右 = 「管理页」<b>独立窗口</b>（1360×900，本机工作台）。
+          两窗<b>共用同一份上游、同一时刻</b>，但<b>互不隶属</b>：关掉管理窗<b>不动</b>主窗，主窗与上游都还活着（日志已验）。</p>
+        <p class="s">反向才是有关联的：关掉主窗会连上游一起收拾 —— 因为那个上游实例是<b>主窗 fork 出来的</b>。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v18-admin.png" alt="v18 主窗 · 侧栏多了「管理页」入口"></div>
+      <div class="meta"><p class="t">② 主窗侧栏多了「⚙️ 管理页 ↗」（点击开独立窗口）</p>
+        <p class="s">入口在侧栏最下方（图里 Tab=downloads）。它<b>不是常驻项</b> —— 只有探到本机上游时才显示，
+          <b>探不到整块隐藏</b>，不留一个点了必然报错的死链。</p>
+        <p class="s">这也是「移除工作台」那条口径的正式修正：<b>不是不要工作台，是把它从 App 的页面里挪成一个独立窗口</b>。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v18-admin-admin.png" alt="v18 管理页独立窗口 · 本机工作台 + 壳注入动作条"></div>
+      <div class="meta"><p class="t">③ 管理页 = 独立窗口（本机工作台 + 壳注入的右下动作条）</p>
+        <p class="s">窗内地址是本机上游 <span class="mono">http://127.0.0.1:8133/index.html</span>（<b>8133 是实拍时特意挑的</b>，避开你正在用的 8123，互不干扰）。<br>
+          右上角是系统画的窗口按钮（<span class="mono">titleBarOverlay</span>），右下角那条胶囊是<b>壳注入</b>的 —— 页面本身零改动。</p>
+        <p class="s">★ 三条纪律各有一条独立断言守着：<b>单例</b>（重复点只聚焦、不新开）/ <b>关闭只置空引用</b>（绝不牵连 <span class="mono">app.quit()</span>）/ <b>不碰上游子进程</b>。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v18-adminbar.png" alt="v18 管理页动作条放大 · 4 按钮 + 本机胶囊"></div>
+      <div class="meta"><p class="t">④ 动作条放大 2.2× —— 4 个按钮 + 「本机」胶囊</p>
+        <p class="s">按钮：<b>📁 下载目录</b> · <b>🕹 扫描本机游戏</b> · <b>↩ 回到 App</b> · <b>⟳ 刷新</b>。
+          每个动作都走 preload 白名单 ⇒ 页面<b>拿不到任意路径或任意 URL</b>（非法动作实测返回 <span class="mono">{"ok":false,"error":"action not allowed"}</span>）。</p>
+        <p class="s">★ 胶囊上的字是<b>上游归属</b>，不是装饰：<b>「本机 · 上游由 App 托管」</b>= 本壳 fork 的；
+          「上游是外部实例」= 你在别处跑着的那个（App 只复用、<b>不冒认</b>）；「归属未知（旧版）」= 对方 health 里还没有 pid 字段。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v18-downloads.png" alt="v18 下载管理 · 上游服务卡（本机实时）"></div>
+      <div class="meta"><p class="t">⑤ 下载管理 —— 新增「上游服务卡」，这是修好之后的（v18）</p>
+        <p class="s">卡里全是真数据：<span class="mono">19,590 条</span> · <span class="mono">30 页</span> ·
+          <span class="mono">XD 已翻页 434 / 上限 433</span> · 解压历史 <b>6</b> 条。归属显示「<b>本机 · 上游由 App 托管</b>」。</p>
+        <p class="s">★ 这张卡顺手抓出一个<b>真 bug</b> —— 见第 ⑥ 张的说明（<b>694 条断言全绿也没拦住它</b>）。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v18-home.png" alt="v18 情报站首页 · 桌面客户端形态"></div>
+      <div class="meta"><p class="t">⑥ 情报站首页（v18 未改视觉，此图用于确认「没被顺手改坏」）</p>
+        <p class="s">★ <b>实拍抓出的真缺陷</b>：上游服务卡一直显示「○ 探测中…」。
+          我先把固定等待撑到 9 s、又加了轮询等它出数据，<b>仍然</b>超时 —— 顺着查才找到根因：<br>
+          <span class="mono">upFill(main)</span> 里写的是 <span class="mono">main.getElementById('upcard')</span>，而
+          <span class="mono">Element</span> 上<b>根本没有</b> <span class="mono">getElementById</span>（它只在 <span class="mono">Document</span> 上）⇒ 抛
+          <span class="mono">TypeError</span> 被 async 吞掉 ⇒ 卡片永远停在探测中。</p>
+        <p class="s">为什么断言没拦住：原来那条行为断言传的是 <span class="mono">document</span>，<b>恰好绕开</b>了这条路径。
+          修法 = 改 <span class="mono">scope.querySelector('#upcard')</span>，并补<b>源码级 + 真 Element 行为级两条判据</b> + 打坏点 M121
+          （实测 <span class="mono">打坏 692/694 → 变红 2 条 → 还原 694/694</span>）。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v18-lib.png" alt="v18 游戏库 · 实时全量库"></div>
+      <div class="meta"><p class="t">⑦ 游戏库 —— 实时全量库（v18 只做「没被改坏」的回归确认）</p>
+        <p class="s">本轮 5 个拍摄点<b>全部第 1 次命中</b>，且 5 张日志里的 <span class="mono">Tab=</span> 与
+          <span class="mono">归属:shell</span> <b>逐张核对通过</b>。</p>
+        <p class="s">★ 这一步不是走形式：桌面杂散输入会把窗口切到别的页，<b>只看图会误判成功能坏了</b>
+          —— v16 实拍时就真撞过一次。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v18-detail.png" alt="v18 详情页 · 双源合并详情"></div>
+      <div class="meta"><p class="t">⑧ 详情页（Tab=pcNew）—— v17 那套双源合并详情，本轮<b>没动</b></p>
+        <p class="s">介绍 / 版本 / 游戏预览 / 配置要求 / 下载与资源四页签，全部沿用 v17 实现；
+          <b>v18 一行业务逻辑都没碰详情</b>，此图只作「没被顺手改坏」的凭证。</p>
+        <p class="s">⚠️ 本页<b>没有「手机模拟器配置」块</b> —— 那是你 v17 明确说不要的，不是还没做。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb" style="background:#0d0d0d;display:flex;align-items:center;padding:14px 16px"><div style="color:#e8e8e6;font-size:12px;line-height:1.75">
+        <b style="color:#00d9c5">Invalid file descriptor to ICU data received.</b><br>
+        <span style="color:#9a9a97">↑ 你截图里那行报错的真身</span><br><br>
+        ① 只拷 <span class="mono">GameIntel.exe</span> 单独跑 ⇒ <b>立刻退出</b>，报这行（EXIT=3）<br>
+        ② 再补同目录 <span class="mono">icudtl.dat</span>（10.4 MB）⇒ 换报
+        <span style="color:#ff9">Error loading V8 startup snapshot file</span><br>
+        ③ <b>必须整个 <span class="mono">dist\GameIntel\</span>（21 个条目 / 515.5 MB）一起搬</b>
+      </div></div>
+      <div class="meta"><p class="t">⑨ 为什么会有那个报错 —— 三层对照实验</p>
+        <p class="s">结论：<b>exe 不是绿色单文件</b>，它是一整个 Electron 发行版目录（缺 <span class="mono">icudtl.dat</span> 就活不了；
+          只补它还缺 V8 snapshot）。要「一个文件发给别人」只能做<b>安装包</b>（NSIS / Inno Setup）或 zip 自解压 ——
+          已记为待办 <b>N-21</b>，本轮没做。</p>
+        <p class="s">⚠️ 另一个坑：本机环境里有 <span class="mono">ELECTRON_RUN_AS_NODE=1</span>，跑壳必须
+          <span class="mono">env -u ELECTRON_RUN_AS_NODE</span>；但<b>成品 exe 双击不受影响</b>（用户怎么点都正常）。</p></div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>v18 改上游的「最小侵入」清单（可直接核对）</b></p>
+    <p>上游 <span class="mono">server.js</span>（<span class="mono">2,852 → 2,881 行</span>，md5
+      <span class="mono">52d34915… → b9858cb8df935c7c8fe7ef9fcefd4abb</span>），只动三处语义：<br>
+      ① 监听地址由「不传 host」（⇒ 绑 <span class="mono">0.0.0.0</span>）改为 <span class="mono">process.env.GAMEHUB_HOST || '127.0.0.1'</span> —— <b>默认只听回环，逃生开关仍在</b>；<br>
+      ② 新增模块级 <span class="mono">BOOT_AT</span>（只取一次）；<br>
+      ③ <span class="mono">app.listen(port, HOST, …)</span> 按新 host 启动并打印实际 host。</p>
+    <p><span class="mono">/api/health</span> <b>只增不改</b>：保留原有 <span class="mono">ok / ts / ttl</span>，新增
+      <span class="mono">pid / startedAt / shell / host / port</span> 五个字段。实测双分支：<b>8124（shell=true）</b> 与
+      <b>8125（shell=false）</b>，<span class="mono">netstat</span> 确认只绑 <span class="mono">127.0.0.1</span>。</p>
+    <p>备份：<span class="mono">_audit/upstream-server.js.orig-52d34915-2026-10-16.bak</span>。⚠️
+      <b>本机正在用的 8123 上跑的还是改前的旧上游</b>（进程从 10-15 10:17 起没重启，netstat 仍是 <span class="mono">0.0.0.0:8123</span>）——
+      <b>重启才生效</b>，而重启会影响你正在用的那个工作台，所以<b>没动</b>（待办 N-22）。</p>
+  </div>
+
+  <h2>★★★ v17（2026-10-16 傍晚）—— <b>上一版</b>：详情页同步工作台 + 跨源同款合并（6 张成品窗口实拍）</h2>
+  <p class="sec-note">
+    本轮三件事：<b>① 点击后的详情页做厚</b> · <b>② 同步工作台详情页的内容（<u>唯独不做「手机模拟器配置」</u>）</b> ·
+    <b>③ 多平台同款游戏合并成一条</b>。<br>
+    ★ 详情页的内容来自上游 <span class="mono">/api/detail/merged</span> —— 双源合并是**服务端**做的
+    （截图按 <span class="mono">fetchers/shots.js</span> 的 <span class="mono">idOf</span> 去重相加、介绍/版本一边有一边就取那边），
+    并回传 <span class="mono">merge</span> 溯源块；前端<b>不自己判</b>哪些是补来的。整组内容与
+    <span class="mono">#dlBlock</span> 同一个<b>探测式契约</b>：探不到本机服务就整块从 DOM 摘掉，
+    纯静态部署（线上 demo）零副作用。<br>
+    ★ 顺带修掉一个既有缺陷：<span class="mono">DL_URL_RE</span> 原来只认 <span class="mono">xdgame.com</span>，
+    而本机实时库返回的是 <span class="mono">xdgamer.com</span>（<b>带 r</b>）⇒ 从「游戏库 / 全局搜索」打开的详情
+    <b>一直取不到源站 URL</b>。<br>
+    ⚠️ 第 4 张是<b>合并</b>的证据：搜「剑星」库里命中 <b>3 条</b>（机地 1 条 + XD 2 条，其中一条是同款），
+    屏幕上只剩 <b>2 张卡</b>，主条上是 <span class="mono">⊕ +1 同款</span> 胶囊。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v17-detail.png" alt="v17 详情弹窗 · 介绍 / 版本 / 预览"></div>
+      <div class="meta"><p class="t">① 详情页 —— 游戏介绍 + <b>版本介绍</b> + 游戏预览（v17）</p>
+        <p class="s">介绍与版本可能来自<b>另一源</b>（机地页面从来没有「版本介绍」、XD 页面没有源站配置要求），
+          补来的会在标题右侧标出「来自机地 / 来自 XDGAME」</p>
+        <p class="s">底部是<b>固定操作条</b>（⬇ 下载与资源 / 关闭）—— 对齐工作台 <span class="mono">.d-dock</span></p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v17-dgal.png" alt="v17 详情 · 游戏预览画廊 + 配置要求"></div>
+      <div class="meta"><p class="t">② 游戏预览画廊 + 配置要求（v17）</p>
+        <p class="s">画廊 = 大图 + 左右翻页 + 计数 + 缩略图条；<b>不做任何图片 URL 改写</b>（尺寸规则只存在于上游 <span class="mono">shots.js</span>）</p>
+        <p class="s">配置要求两栏并列：<b>最低配置恒来自源站</b>，<b>推荐配置来自 Steam 官方接口</b> —— 两套口径<b>不逐字段混搭</b></p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v17-dbot.png" alt="v17 详情底部 · 下载与资源 / 同分类更多 / 平台直达"></div>
+      <div class="meta"><p class="t">③ 详情页底部 —— 下载与资源 + 同分类更多 + 平台直达（v17）</p>
+        <p class="s">「下载与资源」四页签（本体 / Mod / 修改器 / 存档）沿用既有实现；「同分类更多」走上游
+          <span class="mono">/api/library/related</span> 的多因子打分</p>
+        <p class="s">⚠️ 这里<b>没有「手机模拟器配置」块</b> —— 你的口径是<b>不需要</b>，所以同步时整块略过（不是暂时没做）</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v17-libmerge.png" alt="v17 游戏库 · 跨源同款合并成一条"></div>
+      <div class="meta"><p class="t">④ 跨源同款合并 —— 3 条命中，屏幕上 2 张卡（v17）</p>
+        <p class="s">主条上是 <span class="mono">⊕ +1 同款</span>（悬停给出被并入的来源名）。归一口径 = <b>取「/」前段 → 去空白/连接符/大小写</b></p>
+        <p class="s">⚠️ <b>同源变体不并</b>：「剑星-虚拟机版」与「剑星」是<b>不同的资源包</b>，归一后不同组 —— 宁可退回不合并，也不安错内容</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v17-lib.png" alt="v17 游戏库 · 默认页"></div>
+      <div class="meta"><p class="t">⑤ 游戏库默认页（v17）</p>
+        <p class="s">数据是<b>实时全量库</b>（启动即拉本机 8123）。同页内同款已合并，所以一屏可能少于「一页 50 个」</p>
+        <p class="s">分页条的「共 N 条」是<b>服务端命中条数</b>（口径不同，不与当页卡片数打架）</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v17-pcNew.png" alt="v17 PC 新游 · 同一套页内合并"></div>
+      <div class="meta"><p class="t">⑥ PC 新游 / 热游 —— 走同一套页内合并（v17）</p>
+        <p class="s">这两个页与游戏库取的是<b>同一份双源混排库</b>，所以合并规则一致（只跳渲染、不压数组）</p>
+        <p class="s">★ 只动渲染是<b>必须的</b>：<span class="mono">curList</span> 按<b>页内下标</b>取数，把数组压掉就会「点 A 开 B」</p></div>
+    </div>
+  </div>
+
+  <h2>★★ v16（2026-10-16 下午）—— 上一版：八件事落地（10 张成品窗口实拍）</h2>
+  <p class="sec-note">
+    v16 是你本轮点名的<b>八件事</b>，逐条落地：<b>① 不显示数量 + 一页 50 + 分页跳转</b> ·
+    <b>② 全局搜索入口弹窗（结果也弹窗）</b> · <b>③ 网盘直链外挂 OpenList</b> ·
+    <b>④ 点击游戏自动获取资源</b> · <b>⑤ 更像桌面客户端</b> ·
+    <b>⑥ 手游评分（先用上游本来就有的，零新增请求）</b> ·
+    <b>⑦ 活动图逐图适配（正方 icon 完整显示）</b> · <b>本机游戏 ↔ 库记录关联（Steam ID 优先）</b>。<br>
+    下面 10 张是<b>重打包后</b> <span class="mono">GameIntel.exe</span> 的<b>真实窗口像素</b>（1440×900，Electron
+    <span class="mono">--shot</span> 模式）。⚠️ 拍之前先用 <span class="mono">SHOT_JS</span> 把页面<b>强制设到目标状态</b>，
+    并用日志里的 <span class="mono">Tab=</span> 做<b>验收</b> —— 第一次实拍就撞上「窗口在桌面上被杂散输入切到了修改器页」，
+    只看图会误判成功能坏了。<br>
+    ⚠️ <b>「↪ 转存到网盘」按钮在下面这些图里看不到</b>，这是<b>故意的</b>：OpenList 未配置时按钮根本不渲染
+    （不给一个「点了必然报错」的按钮）。它的配置块见第 ⑩ 张。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-home.png" alt="v16 首页 · 桌面客户端形态"></div>
+      <div class="meta"><p class="t">① 首页 —— 桌面客户端形态（v16-G）</p>
+        <p class="s">侧栏 <b>216px 变暗</b>分区 + 32px 行高导航项 + <b>选中项独立竖条</b>；内容区成为独立面板；卡片悬停改成<b>描边</b>、去掉位移动效；<b>侧栏底部常驻状态条</b>「本机实时库 · 已连接」</p>
+        <p class="s">注意：<b>导航项后面已经没有数字了</b>（你 ① 的口径 —— 数量统一交给分页条说一次）</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-lib.png" alt="v16 游戏库 · 实时全量 + 无数字"></div>
+      <div class="meta"><p class="t">② 游戏库 —— 侧栏/页头都不再报数字（v16-A）</p>
+        <p class="s">顶栏与侧栏的计数<b>全部下线</b>。列表改为<b>一页 50 条</b>，翻页交给底部分页条</p>
+        <p class="s">exe · <span class="mono">/api/library/browse?scope=pc&amp;limit=100&amp;offset=…</span></p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-pager.png" alt="v16 分页条 · 页码 + 页长 + 跳转"></div>
+      <div class="meta"><p class="t">③ 分页条 —— 你要的「类似这种页面跳转」（v16-A）</p>
+        <p class="s"><span class="mono">共 131 条 · 50条/页 · 上页 · 1 2 3 · 下页 · 前往 __ 页</span>。<b>数量只在这一处出现</b>。<br>
+        图里左下两张活动图（明日方舟：终末地 / 三角洲行动）就是 ⑦ 的效果：<b>正方 icon 换成正方框 + contain，完整显示不裁切</b>（对照：横版图仍是 16:10 铺满）</p>
+        <p class="s">exe · 手游活动页</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-search.png" alt="v16 全局搜索弹窗 · 结果也在弹窗里"></div>
+      <div class="meta"><p class="t">④ 全局搜索入口弹窗，结果也在弹窗里（v16-B）</p>
+        <p class="s">顶栏入口 / <b>Ctrl+K</b> 唤起，<b>Esc</b> 关闭；结果直接列在弹窗内（含封面 / 标题 / 品类 / 评分），<b>点一行即开详情</b>——详情与搜索两个弹窗可以同时在，方便返回继续挑。<br>
+        ⚠️ 这张是<b>修正后</b>重拍的：第一版「带关键词打开」只把字填进框、<b>没有真的搜</b>（结果区是空态）—— 程序化赋 <span class="mono">value</span> 不会派发 <span class="mono">input</span>，而搜索挂在防抖上。<b>633 条断言全绿也没拦住它</b>，是实拍抓出来的</p>
+        <p class="s">exe · 搜「剑星」→ 共 3 条</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-mEvent.png" alt="v16 手游活动 · 大图大标题 + 可点标签"></div>
+      <div class="meta"><p class="t">⑤ 手游活动 —— 图片/标题放大 + 标签可点（v16-E / v16-F）</p>
+        <p class="s">banner <b>88 → 112px</b>、卡高 <b>106 → 118px</b>、标题 <b>13 → 14.5px</b>（参考 gcores 的杂志式排版）；<b>标签变成可点</b>（点一下直接筛该标签，筛选栏同步点亮）；排序补了 <b>SCORE 评分最高</b></p>
+        <p class="s">exe · 手游活动（共 131 条）</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-mNew.png" alt="v16 手游新游 · 评分与标签"></div>
+      <div class="meta"><p class="t">⑥ 手游新游 —— 评分 &amp; 标签筛选（v16-E）</p>
+        <p class="s">评分走<b>零新增请求</b>：上游 <span class="mono">/api/mobilehub/list</span> 本来就返回 <span class="mono">libScore</span>（端游库评分，已清洗 <span class="mono">0&lt;score≤10</span>），直接 join，不新爬、不编「综合评分」。<b>上游没给分的那部分仍显示「—」</b>（不确定不装确定）</p>
+        <p class="s">exe · 手游新游</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-detail.png" alt="v16 详情抽屉 · 四页签默认就取"></div>
+      <div class="meta"><p class="t">⑦ 点游戏 → 详情，四页签<b>默认就开始取</b>（v16-C）</p>
+        <p class="s">你 ④「点击则自动进行获取」—— 打开即拉「本体 / Mod / 修改器 / 存档」，<b>不用先点一次</b>；页签上的角标就是条数。三种空态分开说：<b>源站限流(429) / 需要登录 / 真的没有</b>——不再把限流说成「这款游戏没有本体」</p>
+        <p class="s">exe · 详情抽屉（从右滑入）</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-mygames-all.png" alt="v16 我的游戏 · 全部候选 + 关联到库"></div>
+      <div class="meta"><p class="t">⑧ 我的游戏 —— 每一行都能<b>手动关联到库</b>（v16-D）</p>
+        <p class="s">扫盘认得 <b>Steam AppID</b>（图里第一行 <span class="mono">Slotbound Demo · Steam 4906570</span>）—— 这是最硬的关联键，<b>改名字也不影响</b>。没匹配到的行给「<b>关联到库…</b>」，挑一条库记录就绑上；绑完下次重扫<b>零请求</b>就能套回，断网也不猜</p>
+        <p class="s">exe · 我的游戏（点「显示全部候选」看没命中的）</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-mygames.png" alt="v16 我的游戏 · 已扫描但零命中"></div>
+      <div class="meta"><p class="t">⑨ 我的游戏 —— 扫完但零命中的诚实空态</p>
+        <p class="s">本机 67 条候选里<b>没有一款匹配到资源</b>（收紧匹配闸门后的真实结果：Steam 库里只有 1 款 Demo）。空态给<b>两条出路</b>：展开全部候选 / 去游戏库，<b>不是死胡同</b></p>
+        <p class="s">exe · 我的游戏</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v16-downloads.png" alt="v16 下载管理 · 网盘直链（OpenList）配置块"></div>
+      <div class="meta"><p class="t">⑩ 下载管理 → <b>网盘直链（OpenList / AList）</b>（v16-H）</p>
+        <p class="s">下拉到底部的配置块：地址 / Token / 转存目录 / <b>连接测试</b> / 保存。<br>
+        ★ <b>只调用、不分发</b>：OpenList 是 <b>AGPL-3.0</b>，打进这个闭源 exe 会把整个包拖进 AGPL ⇒ 我们在里面只往<b>你自己跑的服务</b>发 HTTP，不打包、不代管、不上传。<br>
+        ★ 「启用转存」是 <b>实验性 + 默认关</b>，且<b>必须连接测试通过后</b>才能勾（图里那个框是灰的）；失败时<b>原样贴上游报错</b>，绝不替它编一句「暂不支持」——因为我们<b>没有你的实例可验</b></p>
+        <p class="s">exe · 下载管理页底部</p></div>
+    </div>
+  </div>
+
+  <h2 style="opacity:.75">★★ v15（2026-10-16 晚）—— 上一版 exe 的样子</h2>
+  <p class="sec-note">
+    上一轮（v14）按「情报站落地 + 工作台全量」打的，<b>当轮就被你否掉了</b>：
+    「为什么把我工作站给并到了 exe」。v15 按你重新拍的板重做 ——
+    <b>工作台入口全部移除</b>（它是另一个项目），App 只做三件自己的事：
+    <b>实时全量库</b>（侧栏 19,590 实时）、<b>我的游戏</b>（扫盘 + 启动器匹配 + 命中给下载弹窗）、
+    <b>下载管理</b>（统一队列 + 壳侧真下载）；再加一层<b>桌面客户端形态</b>（自定义标题栏 + 右侧抽屉）。<br>
+    下面 7 张是打包后 <span class="mono">GameIntel.exe</span> 的<b>真实窗口像素</b>（1424×861，Electron <span class="mono">--shot</span> 模式实拍）。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v15-home.png" alt="v15 首页 · 桌面客户端形态"></div>
+      <div class="meta"><p class="t">① 首页 —— 桌面客户端形态</p>
+        <p class="s">自定义标题栏（<span class="mono">titleBarStyle:hidden</span> + overlay，窗口按钮仍是系统画的）+ 左侧 196px 导航 + 细滚动条。右上角 <b>⚡实时库已接入</b></p>
+        <p class="s">exe · 情报站首页</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v15-lib.png" alt="v15 游戏库 · 实时全量"></div>
+      <div class="meta"><p class="t">② 游戏库 —— 实时全量（19,590）</p>
+        <p class="s">数据不再吃那份 10-08 的 demo 快照，改成<b>启动即拉本机实时库</b>（6 路并发、每页 100 条 × 翻页取满、断网回落内置快照）。<b>注</b>：页头「共 N 款」是<b>点进这一页那一刻</b>重新取的上游 total，与顶栏那个是<b>两次测量</b>——实时库在抓取，数字会缓慢变化</p>
+        <p class="s">exe · <span class="mono">/api/library/browse?scope=pc</span></p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v15-mygames.png" alt="v15 我的游戏 · 扫盘结果"></div>
+      <div class="meta"><p class="t">③ 我的游戏 —— 扫盘 + 匹配（默认只显示命中）</p>
+        <p class="s">读 Steam 库 <span class="mono">libraryfolders.vdf</span> + <span class="mono">appmanifest_*.acf</span> + 桌面/开始菜单快捷方式（<b>不读注册表</b>）⇒ 本机 <b>67 条候选</b>。默认只列<b>匹配到资源</b>的，其余收在「显示全部候选 67」后面</p>
+        <p class="s">exe · 壳侧 <span class="mono">scanGames()</span></p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v15-myall.png" alt="v15 我的游戏 · 显示全部候选"></div>
+      <div class="meta"><p class="t">④ 我的游戏 —— 展开全部候选</p>
+        <p class="s">点右上角「<b>显示全部候选 67</b>」看没命中的（多半是工具类快捷方式）。命中为 0 时给的是空态 + 两条出路（展开看全部 / 去游戏库），不是死胡同</p>
+        <p class="s">exe · 我的游戏</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v15-detail.png" alt="v15 详情抽屉 · 下载与资源四页签"></div>
+      <div class="meta"><p class="t">⑤ 点游戏 → 右侧抽屉 + 「下载与资源」四页签</p>
+        <p class="s">《剑星》实时：📦 本体 <b>5</b> · 🧩 Mod <b>190</b> · 🛠 修改器 <b>8</b> · 💾 存档 <b>11</b>。每个地址都带 <b>⬇ 下载 / 复制链接</b>（无壳时自动降级）；本体找不到可直开的地址时**明确说明原因**，不画假按钮</p>
+        <p class="s">exe · 详情抽屉（从右滑入，像 Steam）</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v15-downloads.png" alt="v15 下载管理 · 统一队列"></div>
+      <div class="meta"><p class="t">⑥ 下载管理 —— 统一队列（新增页）</p>
+        <p class="s">壳侧 Node 流下载（自定义 Referer / 自定义落盘目录 / 逐块上报 / 真 abort）。这张图走的是<b>真实链路</b>：页面登记 → 壳下载 → 进度事件回填 ⇒ <span class="mono">GameIntel-sample.zip</span> <b>118 KB / 118 KB 已完成</b>。落盘 <span class="mono">%USERPROFILE%\Downloads\GameIntel\</span></p>
+        <p class="s">exe · 下载管理（顶栏「已载 1520 条（库共 19590 款）」是修文案之后的版本）</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v15-downloads-empty.png" alt="v15 下载管理空态"></div>
+      <div class="meta"><p class="t">⑦ 空态 —— 不是死胡同</p>
+        <p class="s">没有任务时给的是<b>两条出路</b>（去游戏详情点 ⬇ 下载 / 网盘链接也会登记但需点「打开网盘」转存），不是一片空白。<b>诚实标注</b>：下载记录<b>不持久化</b>，重开 App 列表为空 —— 这是当前取舍</p>
+        <p class="s">exe · 下载管理</p></div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:16px">
+    <p><b>v15 的三件必须分清的事</b>：</p>
+    <p><b>① 「移除工作台」≠「不要上游」</b> —— 被移除的是 App 里的<b>导航出口</b>（5 个跳转入口），而上游 <span class="mono">server.js</span> 必须进包，因为它是<b>实时接口的唯一来源</b>。所以包变大了（284 MB → 514.8 MB），但那 216 MB 是<b>数据服务</b>，不是页面。</p>
+    <p><b>② 网盘仍是「转存」不是「直下」</b> —— 实测 MOD 200 条链接里 <b>199 条是迅雷网盘分享页</b>。取真链要「用你自己的登录态调网盘官方 API」：LinkSwift 那类开源实现正是这么做的，但它是 <b>AGPL-3.0（传染性）⇒ 不能抄代码</b>；第三方解析站要把链接发给别人服务器，有隐私与封号风险。<b>在 App 内取链需另立项</b>（内嵌登录窗口 + 自主复刻官方接口）。</p>
+    <p><b>③ 命中的是「真命中」</b> —— 第一版匹配闸门用字符级包含，6 条命中里 4 条以上是假阳性（<span class="mono">Run→Runehaven</span>、<span class="mono">Paint→City Painter</span>、<span class="mono">Chen→Kitchen Sync: Aloha!</span>）。收紧为「整串归一化相等 / 词集完全相同」后命中 <b>6 → 0</b>（本机确实没有那 6 款）。</p>
+  </div>
+
+  <h2 style="opacity:.62">（已被推翻）v14 合并版（2026-10-16 中午）</h2>
+  <p class="sec-note" style="opacity:.62">
+    ⚠️ <b>这一版的方向已作废，仅留档对照</b>：它把 PC 工作台并进了 App。
+    下面 4 张图是当时的成品像素，不要再拿去当「当前版本」用。
+  </p>
+  <div class="gal" style="opacity:.62">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v14-intel.png" alt="情报站落地页"></div>
+      <div class="meta"><p class="t">① 落地页 = 情报站</p>
+        <p class="s">侧栏底部多出「PC 工作台」5 个入口（游戏库 / 端游资源 / 手机专区 / 解包匹配 / 解压助手）—— <b>探到本机服务才显示</b>，探不到整块移除，不留死链</p>
+        <p class="s">exe · 情报站（file:// 直开）</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v14-download.png" alt="详情弹窗下载区块"></div>
+      <div class="meta"><p class="t">② 点游戏 → 「下载与资源」四页签</p>
+        <p class="s">📦 本体 <b>32</b> · 🧩 Mod <b>200</b> · 🛠 修改器 <b>5</b> · 💾 存档 <b>48</b>（赛博朋克2077 实测）</p>
+        <p class="s">exe · 详情弹窗</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v14-mod.png" alt="Mod 页签真网盘链接"></div>
+      <div class="meta"><p class="t">③ Mod 页签：真网盘直链</p>
+        <p class="s">迅雷 / 百度 / 夸克 网盘链接 + 来源 + 作者 + 浏览数；卡内先列 8 条，其余「展开全部 200 条」</p>
+        <p class="s">exe · 详情弹窗</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v14-workbench.png" alt="工作台页与返回情报站按钮"></div>
+      <div class="meta"><p class="t">④ 工作台全量页 + 「← 返回情报站」</p>
+        <p class="s">同一个窗口切到 <span class="mono">/resources.html</span>（走壳的 IPC，不依赖 file:// → http:// 的浏览器策略）；左下角按钮是壳注入的，点它回情报站</p>
+        <p class="s">exe · 上游工作台</p></div>
+    </div>
+  </div>
+
+  <h2>一、exe 窗口外壳 —— 点左侧导航切换</h2>
+  <p class="sec-note">
+    ⚠️ <b>这一段的「外壳」是按旧方案画的示意图（非成品像素）</b> —— v15 的真实形态看最上面那 7 张实拍：
+    <b>自定义标题栏</b>（<span class="mono">titleBarStyle:'hidden'</span> + <span class="mono">titleBarOverlay</span>，窗口按钮仍是系统画的）+
+    左侧导航 + <b>右侧抽屉式详情</b>。下方这个可点的外壳只是「页面索引」，别当成成品样子。
+  </p>
+
+  <div class="frame">
+    <div class="titlebar">
+      <span class="dot" style="background:#3a3a3a"></span><span class="dot" style="background:#3a3a3a"></span><span class="dot" style="background:#3a3a3a"></span>
+      <span class="title">游戏情报客户端 · v0.1.0-demo</span>
+      <span class="winctl"><span class="wbtn"></span><span class="wbtn"></span><span class="wbtn"></span></span>
+    </div>
+    <div class="appbody">
+      <nav class="side" id="side"></nav>
+      <div class="view">
+        <img id="viewimg" src="shots/gh-lib.png" alt="当前选中页面的实拍截图">
+        <div class="viewcap" id="viewcap">游戏库 · 排行 · 搜索</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>二、每个窗口（18 张实拍）</h2>
+  <p class="sec-note">
+    上排 6 张来自 GameHub（实时服务），中间 9 张来自情报客户端 demo。<br>
+    ⚠️ <b>诚实说明</b>：中间那组的「首页」已换成本轮<b>成品窗口实拍</b>（所以它带自定义标题栏），
+    其余 <b>8 张仍是 2026-10-15（v12）的浏览器实拍、本轮未重拍</b> ——
+    因为「桌面客户端形态」只在 <span class="mono">html.has-shell</span> 下生效，浏览器实拍反而拍不到。
+    v15 的成品窗口像素看上面的 7 张，以及下面的「【本机】v15 新增 3 页」。
+  </p>
+
+  <h2 style="margin-top:20px">【游戏库 · 端游资源 · 手机专区】GameHub 6 页</h2>
+  <div class="gal" id="galGh"></div>
+
+  <h2>【游戏情报】demo 9 页（v12 浏览器实拍 · 未重拍）</h2>
+  <div class="gal" id="galDemo"></div>
+
+  <h2>【本机】v15 新增 3 页（成品窗口实拍）</h2>
+  <div class="gal" id="galLocal"></div>
+
+  <h2>三、18 个页面的对照说明</h2>
+  <table>
+    <thead><tr><th style="width:170px">导航项</th><th style="width:150px">来源</th><th>说明</th></tr></thead>
+    <tbody id="tbl"></tbody>
+  </table>
+
+  <h2 style="opacity:.62">四、（v14 时期记录 · 部分已失效）看图后要留意的四件事</h2>
+  <div class="notice" style="opacity:.62">
+    <p><b>⚠️ 本节写于「把工作台合并进 App」的那一版，其中 ③ 已不适用</b> ——
+    v15 已把工作台入口（<span class="mono">#hubNav</span>）整块移除，「两个 MOD 入口并存」不再是 App 内的问题。
+    ② 里「demo PC MOD 没有限流」仍成立，但那个限流方案（§四.1 工具内容三规则）**随合并方案一起暂缓**。</p>
+    <p><b>① ★ 上游其实已经做了「每游戏前 3 条」</b> —— 第 3 张（<span class="mono">resources.html</span>）的 MOD 卡里原文写着「卡内先列前 3 条，点「查看全部」在弹窗里看全量」，卡里就是 1/2/3 三条 + 「查看全部 <b>717</b> 条」（赛博朋克2077 那张）。<br>
+    也就是说 <b>T2（每游戏 ≤3 条）在工具区不是新功能，而是把上游已有呈现搬进合并视图</b> —— 实现成本比预想低，别重造。</p>
+    <p><b>② 但 demo 的 PC MOD 现在没有限流</b> —— 第 14 张那一屏 10 张卡里 <b>5 张是《剑星》</b>（60 条池里它占 20 条）。这正是 T2 要治的那个现象，且 demo 已经自述「单一来源 = 机地」⇒ 合并后 T1（按源归一化混排）才有意义。</p>
+    <p><b>③ 两个「MOD」入口确实会并存</b> —— 第 3 张与第 14 张看的是<b>同一份数据</b>（<span class="mono">mods.json</span>）。按 §四.1 已定案：两侧都保留、统一标「工具」，不删不并。</p>
+    <p><b>④ demo 数据是 2026-10-08 快照，GameHub 那 6 张是刚才实时拍的</b> —— 同款游戏在两区读数会不一样（<span class="mono">builtAt 2026-10-08 16:48</span>），这是时点差不是样式问题。合并后走「API 优先 + 快照兜底」，落差消失。主题不一致同理，留到第 3 步拍板。</p>
+  </div>
+
+  <h2>五、两组容易混的数字（截图里能同时看到）</h2>
+  <table>
+    <thead><tr><th style="width:220px">口径</th><th style="width:150px">数字</th><th>出处</th></tr></thead>
+    <tbody>
+      <tr><td>MOD 数据文件总量</td><td class="mono">8,943 条 / 883 款</td><td>上游 <span class="mono">data/mods.json</span>（含 mod 7,825 + modifier 1,118）</td></tr>
+      <tr><td>resources.html 页头计数</td><td class="mono">360 MOD / 1,377 存档 / 4,483 修改器</td><td>第 3 张截图。是「有链接/可用的子集」，<b>不等于</b>数据文件总量</td></tr>
+      <tr><td>demo PC MOD 池</td><td class="mono">Top 60（19 款游戏）</td><td>第 14 张截图。按浏览降序取前 60，单一来源「机地」</td></tr>
+      <tr><td>roster 名单</td><td class="mono">21,206 条 / 19,547 端游 / 3,347 手游</td><td>第 2 张截图（v10.79 新模块）</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+const PAGES = [
+  {k:'gh-lib',      g:'【游戏库】',   n:'首页 · 全站热榜',      note:'XD 官网榜 + 机地热游榜双源加权合并；顶栏 5 个入口', src:'127.0.0.1:8123/'},
+  {k:'gh-roster',   g:'【游戏库】',   n:'完整名单 · 数据分析',   note:'v10.79 新模块：21,206 条 / 19,547 端游 / 3,347 手游 / 4,154 有资源', src:'127.0.0.1:8123/roster/', tag:'新'},
+  {k:'gh-resources',g:'【端游资源】', n:'端游资源（MOD / 修改器 / 存档）', nav:'端游资源', note:'页头 360 MOD / 1,377 存档 / 4,483 修改器；★ MOD 卡内已「先列前 3 条 + 查看全部」', src:'127.0.0.1:8123/resources.html', tool:true},
+  {k:'gh-emulator', g:'【手机专区】', n:'手机玩 PC · 机型库',   note:'社区配置 / 实测配置 / 模拟器指南；设备代号 → 机型 / SoC / 性能档位', src:'127.0.0.1:8123/emulator.html'},
+  {k:'gh-unpack',   g:'【手机专区】', n:'解包配置匹配',         note:'贴入从游戏包/兼容层工具导出的 JSON → 自动识别架构、兼容层、内存', src:'127.0.0.1:8123/unpack.html'},
+  {k:'gh-extract',  g:'【手机专区】', n:'解压助手',             note:'解包/提取工具页', src:'127.0.0.1:8123/extract.html', tool:true},
+  {k:'demo-home',   g:'【游戏情报】', n:'情报总览',             note:'demo 首页：轮播 + 精选块（固定 5 列 × 10 张）', src:'demo/index.html · tab=home'},
+  {k:'demo-pcNew',  g:'【游戏情报】', n:'PC 新游',              note:'Top 60，按上架日期倒序', src:'demo/index.html · tab=pcNew'},
+  {k:'demo-pcHot',  g:'【游戏情报】', n:'PC 热游',              note:'Top 60，按热度倒序', src:'demo/index.html · tab=pcHot'},
+  {k:'demo-pcRank', g:'【游戏情报】', n:'排行榜',               note:'4 分榜（PC 新游/热游 + 手机新游/热游）× Top 12，固定 2 列，无搜索无筛选', src:'demo/index.html · tab=pcRank'},
+  {k:'demo-pcTrainer',g:'【游戏情报】',n:'PC 修改器',            note:'60 条 = 5 源 × 12（已按源配额，所以这页不受限流影响）', src:'demo/index.html · tab=pcTrainer', tool:true},
+  {k:'demo-pcMod',  g:'【游戏情报】', n:'PC MOD',               note:'Top 60 仅 19 款游戏，《剑星》占 20 条 —— 该屏 10 张卡里 5 张是剑星 ⇒ T2 靶子', src:'demo/index.html · tab=pcMod', tool:true},
+  {k:'demo-mNew',   g:'【游戏情报】', n:'手游新游',             note:'153 条，跨 3 源（TapTap / 好游快爆 / 小七）', src:'demo/index.html · tab=mNew'},
+  {k:'demo-mEvent', g:'【游戏情报】', n:'手游活动',             note:'98 条活动资讯', src:'demo/index.html · tab=mEvent'},
+  {k:'demo-mPlay',  g:'【游戏情报】', n:'手游可玩端游',         note:'与 PC 同一套卡片骨架与网格', src:'demo/index.html · tab=mPlay'},
+  /* ★v12：原 demo-report（端游可视报告）已随模块移除 */
+  /* ★v15：新增「本机」分组 3 页（需要 exe 壳或本机服务才完整生效） */
+  {k:'demo-lib',    g:'【本机】',     n:'游戏库',               note:'v15 新增：实时全量库 19,590 款（6 路并发 · 每页 100 × 翻页取满 · 断网回落内置快照）', src:'demo/index.html · tab=lib'},
+  {k:'demo-myGames',g:'【本机】',     n:'我的游戏',             note:'v15 新增：扫盘 67 条候选 → 启动器匹配 → 命中给下载弹窗；默认只显示命中的，其余收在「显示全部候选」后', src:'demo/index.html · tab=myGames', tag:'新'},
+  {k:'demo-downloads',g:'【本机】',   n:'下载管理',             note:'v15 新增：壳侧真下载 + 统一队列 + 逐块进度；无壳时降级为「⬇ 下载 / ☁️ 复制链接」', src:'demo/index.html · tab=downloads', tag:'新'}
+];
+
+const side = document.getElementById('side');
+const img  = document.getElementById('viewimg');
+const cap  = document.getElementById('viewcap');
+let lastG = '';
+const btns = {};
+PAGES.forEach(p => {
+  if (p.g !== lastG) {
+    const h = document.createElement('p');
+    h.className = 'grp'; h.textContent = p.g.replace(/[【】]/g,'');
+    side.appendChild(h); lastG = p.g;
+  }
+  const b = document.createElement('button');
+  b.className = 'nav';
+  b.innerHTML = (p.nav || p.n) + (p.tool ? '<span class="tag">工具</span>' : '');
+  b.setAttribute('aria-current', 'false');
+  b.onclick = () => select(p.k);
+  side.appendChild(b); btns[p.k] = b;
+});
+function select(k){
+  const p = PAGES.find(x => x.k === k); if (!p) return;
+  Object.keys(btns).forEach(x => btns[x].setAttribute('aria-current', String(x === k)));
+  img.src = 'shots/' + k + '.png';
+  cap.textContent = p.n + '　·　' + p.src + (p.tool ? '　·　标「工具」' : '');
+}
+
+function card(p){
+  const d = document.createElement('div');
+  d.className = 'card';
+  d.innerHTML = '<div class="thumb"><img loading="lazy" src="shots/' + p.k + '.png" alt="' + p.n + ' 截图"></div>'
+    + '<div class="meta"><p class="t">' + p.n + (p.tool ? ' <span style="font-size:10px;color:#0F6E56;background:#E1F5EE;border-radius:3px;padding:0 4px">工具</span>' : '') + '</p>'
+    + '<p class="s">' + p.note + '</p><p class="s">' + p.src + '</p></div>';
+  d.querySelector('.thumb').onclick = () => { select(p.k); document.querySelector('.frame').scrollIntoView({behavior:'smooth',block:'center'}); };
+  return d;
+}
+const gGh = document.getElementById('galGh'), gDe = document.getElementById('galDemo'), gLo = document.getElementById('galLocal');
+const LOCAL_PAGES = ['demo-lib', 'demo-myGames', 'demo-downloads'];
+PAGES.forEach(p => (p.k.startsWith('gh-') ? gGh : (LOCAL_PAGES.indexOf(p.k) >= 0 ? gLo : gDe)).appendChild(card(p)));
+
+const tbl = document.getElementById('tbl');
+PAGES.forEach(p => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td>' + p.n + (p.tool ? ' <span style="font-size:10px;color:#0F6E56;background:#E1F5EE;border-radius:3px;padding:0 4px">工具</span>' : '') + '</td>'
+    + '<td class="mono" style="font-size:11px">' + p.src + '</td><td>' + p.note + '</td>';
+  tbl.appendChild(tr);
+});
+
+select('gh-lib');
+</script>
+</body>
+</html>

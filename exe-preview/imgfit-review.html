@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>图片适配诊断 · 实测与候选</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#fff; --txt:#1c2333; --sub:#667085; --line:#e4e8f0;
+    --accent:#1e4ed8; --warn:#b45309; --warnbg:#fff8ed; --ok:#12a150; --okbg:#eefaf3;
+    --bad:#c0392b; --badbg:#fdecec;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font:13px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+       padding:24px 28px 70px;max-width:1500px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 6px}
+  h2{font-size:15px;margin:0 0 4px}
+  .lead{color:var(--sub);font-size:12.5px;margin-bottom:20px}
+  .lead b{color:var(--txt)}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+  .pdesc{color:var(--sub);font-size:12px;margin:6px 0 12px}
+  .pdesc code,td code{background:#f2f4f9;padding:1px 5px;border-radius:4px;color:#334155;font-size:11.5px}
+  .badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;border:1px solid;margin-left:8px;vertical-align:2px}
+  .b-bad{background:var(--badbg);border-color:#f6c9c9;color:var(--bad)}
+  .b-ok{background:var(--okbg);border-color:#bfe8d2;color:var(--ok)}
+  .b-alt{background:#eef4ff;border-color:#c9d9f7;color:var(--accent)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .it{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+  .it img{display:block;width:100%;height:auto}
+  .cap{font-size:11.5px;color:var(--sub);padding:6px 9px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px}
+  .cap b{color:var(--txt)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{border:1px solid var(--line);padding:5px 8px;text-align:center}
+  th{background:#f7f9fc;font-weight:650;color:var(--sub)}
+  td.l,th.l{text-align:left}
+  td.num{font-variant-numeric:tabular-nums}
+  .g1{background:#eefaf3;color:#0d7a3e;font-weight:700}
+  .g2{background:#f3fbe9;color:#4a7c15}
+  .g3{background:#fff8ed;color:#b45309}
+  .g4{background:#fdecec;color:#c0392b;font-weight:700}
+  .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .k{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+  .k .n{font-size:23px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.25}
+  .k .n.r{color:var(--bad)} .k .n.g{color:var(--ok)} .k .n.b{color:var(--accent)}
+  .k .t{font-size:11.5px;color:var(--sub);margin-top:2px}
+  .note{background:var(--warnbg);border:1px solid #fadfae;border-left:3px solid var(--warn);color:#7c4a03;
+        border-radius:8px;padding:10px 13px;font-size:12.2px;margin:10px 0}
+  .note b{color:#5c3602}
+  .note.bad{background:var(--badbg);border-color:#f6c9c9;border-left-color:var(--bad);color:#7a1f14}
+  .note.bad b{color:#5c130b}
+  .note.ok{background:var(--okbg);border-color:#bfe8d2;border-left-color:var(--ok);color:#0b5f38}
+  .note.ok b{color:#08482a}
+  .mono{font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
+  .tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .tabs button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 13px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--sub)}
+  .tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:650}
+  .sw{display:none}.sw.on{display:block}
+  ul{margin:6px 0 0;padding-left:20px}
+  li{margin:3px 0}
+  .pill{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:5px;background:#eef4ff;color:var(--accent);border:1px solid #c9d9f7;margin-right:5px}
+</style>
+</head>
+<body>
+
+<h1>前端图片适配 · 实测诊断与候选对照</h1>
+<div class="lead">
+  对象：<b>demo/index.html</b>（游戏情报客户端）。方法：真实 Chrome 实拍 + CDP 逐张量测容器框与原图，
+  共采样 <b>651 张图</b>。全部数字为实测值，非估算。
+</div>
+
+<div class="panel" style="border-left:4px solid var(--ok);background:var(--okbg)">
+  <h2 style="color:#08482a">★ 已执行（v11，2026-10-15）—— 本页是决策依据，结论已落地</h2>
+  <div class="pdesc" style="color:#0b5f38;margin-bottom:10px">
+    采纳<b>乙（按源自适应）</b>+ <b>收窄小卡到 240px</b>。改动共 <b>3 处 CSS + 1 行 JS</b>，<code>data.js</code> 零改动。
+  </div>
+  <table style="background:#fff">
+    <tr><th class="l">容器</th><th>改前 最狠裁切</th><th>改后 最狠裁切</th><th>改后容器比例</th></tr>
+    <tr><td class="l"><code>pcNew</code>（例外保留 16:9）</td><td class="num">16.9%</td><td class="num g1">16.9% ✓ 未变</td><td class="num">1.777</td></tr>
+    <tr><td class="l"><code>pcHot</code> / <code>pcMod</code> / <code>pcTrainer</code> / <code>mPlay</code></td><td class="num g4">43.8%</td><td class="num g1">33.3%</td><td class="num">1.500</td></tr>
+    <tr><td class="l"><code>pcRank</code> 排行榜（4 分榜 48 张）</td><td class="num g4">43.8%</td><td class="num g1">33.3%</td><td class="num">1.500</td></tr>
+    <tr><td class="l"><code>home</code> 精选块</td><td class="num g4">43.8%</td><td class="num g1">33.3%</td><td class="num">1.500</td></tr>
+    <tr><td class="l"><code>home</code> 右小卡</td><td class="num g4">48.2%</td><td class="num g2">39.1%</td><td class="num">1.643</td></tr>
+    <tr><td class="l"><code>mEvent</code>（16:10 banner，按设计不动）</td><td class="num">37.5%</td><td class="num">37.5%</td><td class="num">1.600</td></tr>
+  </table>
+  <div class="pdesc" style="color:#0b5f38;margin:10px 0 0">
+    jsdom 断言 <b>358 / 358 全绿</b>（与改动前基线一致，零断言改动）。新指纹
+    <span class="mono">index.html = ca16e4d960a6a3a8f9921f6dbecddf84</span>。
+    <b>过程里抓到一处「改了没生效」：</b><code>.rth</code> 的硬编码 <code>aspect-ratio:16/9</code> 会压住
+    <code>.cv</code> 的 <code>var(--th-ar)</code>，导致排行榜 48 张图不跟随 —— 已改为 <code>var(--th-ar)</code>。
+  </div>
+</div>
+
+<div class="kpi">
+  <div class="k"><div class="n b">651</div><div class="t">实测图片张数（10 个 Tab）</div></div>
+  <div class="k"><div class="n r">43.8%</div><div class="t">现行卡位 16:9 的「最狠单张裁切」<br>每个 Tab 都有图被裁这么多</div></div>
+  <div class="k"><div class="n r">57.8%</div><div class="t">首页右小卡 @1280 宽<br>最惨的一处</div></div>
+  <div class="k"><div class="n g">0</div><div class="t">源图中落在 1.2~1.6 与 ≥2.3 区间的数量<br>（比例只有两簇）</div></div>
+</div>
+
+<!-- ============ 一、病灶 ============ -->
+<div class="panel">
+  <h2>一、病灶：源图比例是「双峰」，而卡位定在双峰之间的空档里<span class="badge b-bad">根因</span></h2>
+  <div class="pdesc">
+    实测 651 张图的原始比例只落在两处：<b>1:1 方图 297 张（46%）</b> 与 <b>2.14 宽图 282 张（44%）</b>，
+    近 16:9 只有 64 张（10%）。<b>1.2~1.6 与 ≥2.3 两个区间一张图都没有</b>。
+    而卡位统一是 <code>--th-ar: 16 / 9</code>（1.778）—— 恰好落在两簇正中间的空档。
+  </div>
+
+  <table style="margin-bottom:14px">
+    <tr><th class="l">源图比例区间</th><th>张数</th><th>占比</th><th>分布</th></tr>
+    <tr><td class="l">&lt;1.2 方图 / 竖图</td><td class="num">297</td><td class="num">46.2%</td><td class="l g3">██████████████████████</td></tr>
+    <tr><td class="l">1.2 – 1.6</td><td class="num">0</td><td class="num">0%</td><td class="l">— 空档</td></tr>
+    <tr><td class="l">1.6 – 1.9 近 16:9</td><td class="num">64</td><td class="num">10.0%</td><td class="l g1">█████</td></tr>
+    <tr><td class="l">1.9 – 2.3 宽图</td><td class="num">282</td><td class="num">43.8%</td><td class="l g3">█████████████████████</td></tr>
+    <tr><td class="l">≥2.3 超宽</td><td class="num">0</td><td class="num">0%</td><td class="l">— 空档</td></tr>
+  </table>
+
+  <div class="pdesc">直接后果 —— 同一屏里，方图被上下切、宽图被左右切，<b>两类都无法幸免</b>：</div>
+  <div class="row2">
+    <div class="it"><img src="crops/pcTrainer-now.png" alt="">
+      <div class="cap"><b>现行 16:9 · cover</b><span>《幻兽帕鲁》只剩中间一条，图上文字被切</span></div></div>
+    <div class="it"><img src="crops/pcTrainer-32.png" alt="">
+      <div class="cap"><b>候选 3:2 · cover</b><span>同一张图，可见内容明显变多</span></div></div>
+  </div>
+</div>
+
+<!-- ============ 二、试算矩阵 ============ -->
+<div class="panel">
+  <h2>二、试算：把卡位换成别的比例，每个 Tab 会怎么变</h2>
+  <div class="pdesc">
+    用<b>实测的每张图原比例</b>逐个代入计算（不是按假设的 1:1 / 2.14 手算）。
+    格式 <span class="mono">均值裁 / 最狠裁</span>，越小越好。绿=好，红=差。
+  </div>
+  <table>
+    <tr>
+      <th class="l">容器 / Tab</th><th>张数</th>
+      <th>16:9<br><span class="mono">现行</span></th>
+      <th>16:10</th><th>3:2</th><th>1.46<br><span class="mono">几何中点</span></th>
+    </tr>
+    <tr><td class="l"><code>pcNew</code> PC 新游</td><td class="num">60</td>
+      <td class="g1">16.9% / 16.9%</td><td class="g2">25.2% / 25.2%</td><td class="g3">29.9% / 29.9%</td><td class="g3">31.6% / 31.6%</td></tr>
+    <tr><td class="l"><code>mPlay</code> 手游可玩端游</td><td class="num">59</td>
+      <td class="g2">17.8% / <b>43.8%</b></td><td class="g2">25.6% / 37.5%</td><td class="g3">30.0% / 33.3%</td><td class="g3">31.6% / 31.7%</td></tr>
+    <tr><td class="l"><code>pcTrainer</code> PC 修改器</td><td class="num">60</td>
+      <td class="g2">20.5% / <b>43.8%</b></td><td class="g3">26.8% / 37.5%</td><td class="g3">30.3% / 33.3%</td><td class="g3">31.6% / 31.7%</td></tr>
+    <tr><td class="l"><code>pcMod</code> PC MOD</td><td class="num">60</td>
+      <td class="g2">22.3% / <b>43.8%</b></td><td class="g3">27.7% / 37.5%</td><td class="g3">30.6% / 33.3%</td><td class="g3">31.6% / 31.7%</td></tr>
+    <tr><td class="l"><code>pcHot</code> PC 热游</td><td class="num">60</td>
+      <td class="g3">27.2% / <b>43.8%</b></td><td class="g3">29.9% / 37.5%</td><td class="g3">31.2% / 33.3%</td><td class="g3">31.6% / 31.7%</td></tr>
+    <tr><td class="l"><code>home</code> 首页精选块</td><td class="num">20</td>
+      <td class="g3">30.3% / <b>43.8%</b></td><td class="g3">31.4% / 37.5%</td><td class="g3">31.6% / 33.3%</td><td class="g3">31.6% / 31.7%</td></tr>
+    <tr><td class="l"><code>home</code> 首页右小卡 <span class="pill">最狠</span></td><td class="num">18</td>
+      <td class="g4">34.8% / <b>43.8%</b></td><td class="g3">33.4% / 37.5%</td><td class="g3">32.2% / 33.3%</td><td class="g3">31.6% / 31.7%</td></tr>
+    <tr><td class="l"><code>pcRank</code> 排行榜</td><td class="num">48</td>
+      <td class="g4">37.0% / <b>43.8%</b></td><td class="g3">34.4% / 37.5%</td><td class="g3">32.5% / 33.3%</td><td class="g3">31.6% / 31.7%</td></tr>
+    <tr><td class="l"><code>mEvent</code> 手游活动</td><td class="num">98</td>
+      <td class="g1">15.2% / <b>43.8%</b></td><td class="g2">19.5% / 37.5%</td><td class="g3">21.7% / 33.3%</td><td class="g3">22.5% / 31.7%</td></tr>
+  </table>
+  <div class="note">
+    <b>怎么读这张表：</b>16:9 的「均值」在多数 Tab 反而最优（因为它在两簇中点，一半少裁一半多裁），
+    但它的「<b>最狠</b>」永远是 <b>43.8%</b> —— 也就是<b>每一屏都能挑出被裁掉四成的图</b>。
+    用户说的「图片适配有问题」，指的正是这一列。<b>3:2 把最狠压到 33.3%，代价是均值涨 2~10 个百分点。</b>
+  </div>
+</div>
+
+<!-- ============ 三、首页小卡 ============ -->
+<div class="panel">
+  <h2>三、首页右小卡：唯一会「随窗口漂移」的容器<span class="badge b-bad">机制缺陷</span></h2>
+  <div class="pdesc">
+    它是全站唯一<b>没有定比</b>的图片容器 —— <code>.hsitem{flex:1;min-height:0}</code>，
+    高度由 <code>.hero</code> 剩多少决定，而 <code>.hero</code> 的高度又取决于
+    <code>.hpic{flex:0 0 52%;max-width:560px}</code> 这个组合随窗口宽度的非线性变化。
+  </div>
+  <table style="margin-bottom:12px">
+    <tr><th class="l">窗口宽度</th><th>小卡实际比例</th><th>相对 16:9 的偏离</th><th>方图被纵裁</th></tr>
+    <tr><td class="l mono">1280 × 800</td><td class="num">2.367</td><td class="num g4">+33.1%</td><td class="num g4">57.8%</td></tr>
+    <tr><td class="l mono">1440 × 900</td><td class="num">1.930</td><td class="num g3">+8.6%</td><td class="num g3">48.2%</td></tr>
+    <tr><td class="l mono">1600 × 900</td><td class="num">1.630</td><td class="num g2">−8.3%</td><td class="num g2">38.6%</td></tr>
+    <tr><td class="l mono">1920 × 1080</td><td class="num g1">1.600</td><td class="num g1">−10.0%</td><td class="num g2">37.5%</td></tr>
+  </table>
+  <div class="pdesc" style="margin-top:-4px">
+    漂移根因：<code>.hpic{flex:0 0 52%;max-width:560px}</code> ——
+    主区内容宽超过约 <b>1077px</b> 后，<code>max-width:560px</code> 开始生效，<code>.hpic</code> 宽被锁死、
+    高度随之锁死；在此之前它跟着 <code>52%</code> 线性变化。<b>这个「悬崖」正好落在 1500~1600 之间</b>，
+    所以 1440 与 1600 相差 0.3 个比例单位。
+  </div>
+  <div class="note bad">
+    <b>这条比第一条更该修：</b>「卡位大小必须统一」是本项目的既有决策，而首页小卡的卡位
+    <b>根本不一致</b> —— 换个窗口宽度，同一张图就被多裁 20 个百分点。
+    exe 窗口若默认 1280 宽，首页看到的正是最惨的那一档。
+  </div>
+
+  <div class="pdesc">试过三种「改填充方式」的解法，<b>都不成立</b>（实拍为证）：</div>
+  <div class="row3">
+    <div class="it"><img src="crops/hs-now.png" alt="">
+      <div class="cap"><b>现行</b><span>cover + center</span></div></div>
+    <div class="it"><img src="crops/hs-contain.png" alt="">
+      <div class="cap"><b>contain + 深色衬底</b><span>❌ 两侧各留 65px 黑边，像字幕</span></div></div>
+    <div class="it"><img src="crops/hs-top.png" alt="">
+      <div class="cap"><b>cover + position 25%</b><span>❌ 一张改善、一张更糟</span></div></div>
+  </div>
+  <div class="note ok" style="margin-top:12px">
+    <b>所以结论是：填充方式治不了这个病，只能改容器比例。</b>
+    一刀切的 <code>object-position</code> 依赖「封面主体偏上」这个前提，
+    实测《赛博朋克2077》因此变好、《生化危机9》反而更差 —— 不可推广，已排除。
+  </div>
+</div>
+
+<!-- ============ 四、候选对照 ============ -->
+<div class="panel">
+  <h2>四、改前 / 改后 实拍对照<span class="badge b-ok">右侧即当前实际观感</span></h2>
+  <div class="pdesc">同一批图、同一窗口、只改卡位比例。点标签切换 Tab。左边是 v10（16:9），右边是 v11（3:2）。</div>
+  <div class="tabs" id="tabs">
+    <button data-k="pcTrainer" class="on">PC 修改器</button>
+    <button data-k="pcHot">PC 热游</button>
+    <button data-k="pcRank">排行榜</button>
+    <button data-k="home">首页</button>
+  </div>
+  <div id="sws"></div>
+</div>
+
+<!-- ============ 五、方案 ============ -->
+<div class="panel">
+  <h2>五、三个可选方案</h2>
+  <table>
+    <tr><th class="l">方案</th><th class="l">做法</th><th>最狠裁切</th><th class="l">代价</th></tr>
+    <tr>
+      <td class="l"><b>甲 · 全局 3:2</b> <span class="badge b-bad" style="margin:0">未采纳</span></td>
+      <td class="l">把 <code>--th-ar</code> 从 <code>16 / 9</code> 改成 <code>3 / 2</code>，一处改动，全部 Tab 生效</td>
+      <td class="num g1">43.8% → 33.3%</td>
+      <td class="l">卡片高 +18.5%（126px → 149px）；<br><b>pcNew 会从 16.9% 恶化到 29.9%</b>（它全是宽图，本来就合适）</td>
+    </tr>
+    <tr>
+      <td class="l"><b>乙 · 按源自适应</b> <span class="badge b-ok" style="margin:0">★ 已采纳</span></td>
+      <td class="l">单源宽图的 <code>pcNew</code> 保持 16:9；其余混源 Tab（pcHot/pcRank/pcTrainer/pcMod/mPlay/home）改 3:2</td>
+      <td class="num g1">43.8% → 33.3%</td>
+      <td class="l">不同 Tab 卡位比例不同（但项目里本来就有 16:9 / 16:10 / 1:1 三套，不算新增复杂度）；<br>需多看一个 CSS 变量</td>
+    </tr>
+    <tr>
+      <td class="l"><b>丙 · 只修首页小卡</b> <span class="badge b-ok" style="margin:0">已采纳（收窄 240px 版）</span></td>
+      <td class="l">不动 <code>--th-ar</code>，只给 <code>.hsitem</code> 定比（连带 <code>.hpic</code> / <code>.hero</code> 高度契约要调）</td>
+      <td class="num g2">48~57.8% → 37.5%</td>
+      <td class="l">只治首页；其余 8 个 Tab 的 33–43% 裁切全部保留</td>
+    </tr>
+  </table>
+  <div class="note" style="margin-top:14px">
+    <b>我的建议：乙 + 丙 一起做。</b>
+    乙解决「每屏都有图被裁四成」，丙解决「首页小卡随窗口漂」——
+    两者互不冲突：乙改的是 <code>.cv</code> 系的卡片封面，丙改的是首页 <code>.hsitem</code>。
+    甲是乙的退化版（少一个判断，但会牺牲 pcNew）。
+  </div>
+  <div class="note ok">
+    <b>已排除的做法（别再捡回来）：</b>
+    ① 同图模糊铺底（v5–v6 的 A 方案，用户明确否决过：「很奇怪、未适配」）；
+    ② <code>contain</code> + 浅灰/深色衬底（实测两侧留白 65px，观感像字幕黑边）；
+    ③ 一刀切 <code>object-position</code>（实测一好一坏，不可推广）。
+  </div>
+</div>
+
+<div class="panel">
+  <h2>六、改动会碰到什么（影响面）</h2>
+  <ul>
+    <li><b>jsdom 断言基线</b>：改动前实测 <span class="mono">358 / 358 全绿</span>，改后必须仍是 358/358。</li>
+    <li><b>「逐行定高」那套尺寸</b>：<code>--cd-t2</code> / <code>--cd-meta</code> 是与 <code>--th-ar</code> 配套的，改比例要同步复核卡片总高。</li>
+    <li><b>只改 CSS 变量即可生效</b>：<code>.cv</code> 用 <code>aspect-ratio:var(--th-ar)</code>，没有任何 JS 读这个值 ⇒ 不需要改 JS。</li>
+    <li><b>不影响打包</b>：这一步在 <code>PACK-GameHub-exe.md</code> 的执行链里排在打包之前，属于「先修再打」的范畴。</li>
+  </ul>
+</div>
+
+<script>
+const PAGES = {
+  pcTrainer:['PC 修改器', 'pcTrainer'],
+  pcHot:['PC 热游', 'pcHot'],
+  pcRank:['排行榜', 'pcRank'],
+  home:['首页', 'home']
+};
+const K = Object.keys(PAGES);
+document.getElementById('sws').innerHTML = K.map(k=>{
+  const [label] = PAGES[k];
+  return `<div class="sw ${k==='pcTrainer'?'on':''}" data-k="${k}">
+    <div class="row2">
+      <div class="it"><img src="shots/demo-${k}.png" alt="">
+        <div class="cap"><b>v10 · 16:9 + cover</b><span>${label}</span></div></div>
+      <div class="it"><img src="shots-after/after-${k}.png" alt="">
+        <div class="cap"><b>v11 · 3:2 + cover</b><span>${label}</span></div></div>
+    </div>
+  </div>`;
+}).join('');
+document.getElementById('tabs').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on', x===b));
+  document.querySelectorAll('.sw').forEach(s=>s.classList.toggle('on', s.dataset.k===b.dataset.k));
+});
+</script>
+</body>
+</html>
