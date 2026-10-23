@@ -77,7 +77,54 @@ td.mono{font-family:ui-monospace,Consolas,monospace}
     <div><p class="l">实拍张数</p><p class="v"><b>2（v24 成品 · 最新）</b><br>+ 2（v23）+ 1（v22）+ 2（v21）+ 2（v20）+ 2（v19）+ 6窗口/2合成（v18）+ 6（v17）+ 10（v16）+ 7（v15）</p></div>
   </div>
 
-  <h2>★★★★★★★★★★★★★ v27（2026-10-23）—— <b>最新一版</b>：首页榜单<b>默认只露 Top 5</b>，其余折叠（可展开全部 12）</h2>
+  <h2>★★★★★★★★★★★★★★ v28（2026-10-23）—— <b>最新一版</b>：网盘<b>走跳转自己转存</b>，磁力链<b>交给引擎真下</b></h2>
+  <p class="sec-note">
+    用户口径（原文）：<b>「网盘这个还是之前那样是吧，通过跳转自己转存。如果获取到磁力链则可以拉起 app 那样」</b>。<br>
+    <b>① 网盘不做自动转存</b>：仍是「复制链接 + 唤起本机网盘客户端 → 你自己转存」。
+    OpenList 那套代码一行没删，但它<b>仍是「配了才出现」的可选外挂</b>，默认界面上看不到。<br>
+    <b>② 磁力链必须真能下</b>：新增 <span class="mono">dlKindOf()</span> 四分类 ——
+    <span class="mono">file</span>（http+文件后缀）→ aria2 直下；
+    <span class="mono">magnet</span> → 交给 aria2；<span class="mono">thunder:// / ed2k://</span> → 只能复制；
+    其余 http → 打开网盘手动转存。<br>
+    <b>③ 修掉的是一个「看起来在做事」的 bug</b>：v27 及以前判断形态只有
+    <span class="mono">isDirectFile()</span>（只认 http + 文件后缀），
+    <span class="mono">magnet:?</span> 不匹配 ⇒ 落进网盘分支 ⇒ <b>磁力链永远不会下载</b>，
+    而按钮还写着「☁️ 转存下载」。<b>不是下不了，是根本没走到下载那一步。</b><br>
+    <b>④ 顺手抓到两个更隐蔽的真 bug</b>（真窗口探针抓的，读代码看不出来）：
+    进度回推用 aria2 的 <span class="mono">files[0].uris[0].uri</span> 覆盖
+    <span class="mono">url</span> —— 磁力取元数据阶段该字段是空的，于是页面存的 magnet 地址被清成空串
+    （「复制链接 / 重试 / 重启对账」全部失效）；对账又只按 <span class="mono">url</span> 匹配 ⇒
+    活着的磁力任务重启后被判失败。两处都已修，并各配一条反证断言。
+  </p>
+  <div class="gal">
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v28-mod.png" alt="v28 MOD 资源区：每条资源一个「打开网盘 · 手动转存」按钮 + 浏览器打开出口"></div>
+      <div class="meta"><p class="t">① MOD 资源区：文案改成「打开网盘 · 手动转存」</p>
+        <p class="s">原来写「☁️ 转存下载」，听着像会自动转 —— 实际是复制链接 + 唤起本机客户端，
+          一步都不会替你做。改名之后<b>它做什么、你要做什么</b>一眼能分清，后面还留着
+          「夸克网盘 ↗」的浏览器出口。</p>
+        <p class="s">这一屏同时是边界证据：MOD 的链接<b>全是网盘分享页</b>（199/200），
+          源站没给直链，壳也变不出来 —— 所以这里的按钮只能是「打开网盘」。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v28-downloads.png" alt="v28 下载管理：磁力入口 + 一条需手动转存的网盘任务"></div>
+      <div class="meta"><p class="t">② 下载管理：磁力入口在上、任务状态如实写</p>
+        <p class="s">网盘任务的状态仍是<b>「需手动转存」</b>，右侧给「复制链接 / 打开网盘」两个动作 ——
+          这条路径本轮<b>没有任何改动</b>，正是用户说的「还是之前那样」。</p>
+        <p class="s">底部引擎行显示 <b>aria2 1.37.0 就绪</b>：磁力任务就是喂给它。
+          专用链（<span class="mono">thunder://</span>）会显示<b>「需本机对应客户端」</b>，
+          不和网盘共用一个词 —— 那是两件事。</p></div>
+    </div>
+    <div class="card">
+      <div class="thumb"><img loading="lazy" src="shots/v28-detail.png" alt="v28 游戏详情页：下载与资源在页面下方"></div>
+      <div class="meta"><p class="t">③ 游戏详情：资源块位置未变</p>
+        <p class="s">本轮只动「链接怎么判、按钮怎么给」，<b>没动版式</b>。
+          下图这款刚好是「源站要求登录 / 权限」的情形 —— 空态文案与重试按钮保持原样，
+          因为 <b>限流 / 需登录 / 真的没有</b> 三种空态本来就分开写，不能混成一句「没有资源」。</p></div>
+    </div>
+  </div>
+
+  <h2>★★★★★★★★★★★★★ v27（2026-10-23）：首页榜单<b>默认只露 Top 5</b>，其余折叠（可展开全部 12）</h2>
   <p class="sec-note">
     起因是 v26 落地后的副作用：首页此时已有 <b>26 张精选卡 + 48 行榜</b>，滚动明显变长，
     而<b>榜首几条与上方精选本来就是同一批游戏</b>（同一个池子、同一套排序）。<br>

@@ -3665,18 +3665,27 @@ async function dlReconcile(){
   let r = null;
   try{ r = await SHELL.dlList(); }catch(e){ return; }
   const tasks = (r && r.tasks) || [];
-  const byUrl = new Map();
-  for(const t of tasks){ if(t && t.url) byUrl.set(String(t.url), t); }
+  const byUrl = new Map(), byGid = new Map();
+  for(const t of tasks){
+    if(!t) continue;
+    if(t.url) byUrl.set(String(t.url), t);
+    if(t.id) byGid.set(String(t.id), t);
+  }
   let changed = false;
   for(const j of DL_JOBS){
     if(j.state === 'done' || j.state === 'fail' || j.state === 'manual') continue;
-    const t = byUrl.get(String(j.url || ''));
+    /* ★v28：**先按 gid 认，再按 url 认**。
+       磁力任务在取元数据阶段 `url` 是空的（aria2 的 `files[0].uris` 还没填），
+       只按 url 匹配 ⇒ 重启后活着好好的磁力任务会被判成「不在引擎中」并标失败。
+       gid 是引擎自己给的主键，比 url 稳。 */
+    const t = (j.gid && byGid.get(String(j.gid))) || byUrl.get(String(j.url || ''));
     if(t){
-      if(t.id) j.gid = t.id;
+      if(t.id && !j.gid) j.gid = t.id;
       if(t.state && t.state !== j.state){ j.state = t.state; changed = true; }
       if(t.got) j.got = t.got;
       if(t.total) j.total = t.total;
       if(t.dest) j.dest = t.dest;
+      if(t.name && !j.name) j.name = t.name;
       if(t.err && t.state === 'fail') j.err = t.err;
     }else{
       j.state = 'fail';
@@ -3686,7 +3695,7 @@ async function dlReconcile(){
   }
   for(const t of tasks){
     if(!t || !t.url) continue;
-    if(DL_JOBS.some(j => String(j.url || '') === String(t.url))) continue;
+    if(DL_JOBS.some(j => String(j.url || '') === String(t.url) || (j.gid && String(j.gid) === String(t.id)))) continue;
     const j = dlJobAdd({ name:t.name || '下载', url:t.url, kind:t.kind || 'file',
                          state:t.state || 'done', got:t.got || 0, total:t.total || 0,
                          dest:t.dest || '', engine:'aria2' });
@@ -3730,7 +3739,9 @@ function renderDownloads(main){
     const p = jobPct(j);
     const canOpen = j.state === 'done' && j.dest;
     const stTxt = { waiting:'排队中', running:(j.total ? p + '%' : '下载中'), done:'已完成',
-                    fail:'失败', pause:'已暂停', manual:'需手动转存' }[j.state] || j.state;
+                    fail:'失败', pause:'已暂停',
+                    /* ★v28：专用链不是「转存」，别用一个词盖住两件事 */
+                    manual:(j.kind === 'client' ? '需本机对应客户端' : '需手动转存') }[j.state] || j.state;
     /* ★ manual 态**总是**给「复制链接」（2026-10-16 实拍发现）——
        原来下面那行判的是 `j.kind === 'netdisk'`，于是落进 manual 的**非网盘**任务
        一个按钮都没有：源站只给「帖子页 / 无后缀的接口地址」时 kind 仍是 'file'，
@@ -3745,7 +3756,7 @@ function renderDownloads(main){
     if(j.err) meta.push(esc(j.err));
     return `<div class="dljob ${j.state}">
       <div class="jhd">
-        <span class="jic">${j.kind === 'netdisk' ? '☁️' : (j.kind === 'magnet' ? '🧲' : (j.state === 'done' ? '✅' : (j.state === 'fail' ? '⚠️' : '⬇️')))}</span>
+        <span class="jic">${j.kind === 'netdisk' ? '☁️' : (j.kind === 'client' ? '🔗' : (j.kind === 'magnet' ? '🧲' : (j.state === 'done' ? '✅' : (j.state === 'fail' ? '⚠️' : '⬇️'))))}</span>
         <span class="jnm" title="${esc(j.name)}">${esc(j.name)}</span>
         <span class="jst">${esc(stTxt)}</span>
       </div>
@@ -3813,7 +3824,60 @@ function renderDownloads(main){
 /* ======================= 下载动作（供详情弹窗与下载页共用） ======================= */
 /* 判断一个链接是不是「能直接下的文件」：http(s) 且路径以常见文件后缀结尾。 */
 const DL_FILE_RE = /^https?:\/\/.+\.(zip|rar|7z|exe|msi|tar|gz|pak|bin|iso|dmg|psarc|dat)(\?.*)?$/i;
+const DL_MAG_RE  = /^magnet:\?/i;
+/* ★v28：迅雷专用链 / 电驴链 —— **我们下不了**，只能复制给本机对应客户端。
+   刻意不并进「直链」：`electron/aria2.js` 的 `add()` 只收 `http(s)|ftp|magnet`，
+   把 thunder:// 交过去必然回 `bad-url`。与其画个点了没反应的按钮，不如如实标成「复制」。 */
+const DL_CLI_RE  = /^(thunder|ed2k):\/\//i;
 function isDirectFile(u){ return typeof u === 'string' && DL_FILE_RE.test(u); }
+
+/** ★v28 链接四分类 —— 决定「这条能不能交给下载引擎」。
+ *    file     http(s) + 文件后缀      ⇒ aria2 直下
+ *    magnet   磁力链                  ⇒ aria2（先取元数据再下，可回下载管理里选文件）
+ *    client   `thunder://` / `ed2k://` ⇒ 只能复制给本机对应客户端
+ *    netdisk  其余 http(s)（分享页）  ⇒ 跳转 + 用户自己转存
+ *
+ *  ⚠️ 为什么要单列一个函数、而不是继续只判 `isDirectFile`：
+ *     那样磁力链会**掉进 netdisk 分支**（v27 及以前就是这样）——
+ *     拿到一条磁力链，程序去「复制链接 + 唤起网盘客户端」，**永远不会下载**。
+ *     用户 2026-10-23 的口径就是「如果获取到磁力链则可以拉起 app 那样」。 */
+function dlKindOf(u){
+  if (typeof u !== 'string' || !u) return 'netdisk';
+  if (DL_MAG_RE.test(u)) return 'magnet';
+  if (DL_CLI_RE.test(u)) return 'client';
+  if (DL_FILE_RE.test(u)) return 'file';
+  return 'netdisk';
+}
+
+/** 复制任意文本：壳里走主进程剪贴板，网页版退到 `navigator.clipboard`。
+ *  ★ 网页版没有 `SHELL`，而 `data-dlcopy` 那条路要**任务 id** ⇒ 磁力/专用链没法复用它。 */
+function copyAny(t){
+  const v = String(t || '');
+  if (!v) return false;
+  if (SHELL && typeof SHELL.copyText === 'function') { SHELL.copyText(v); return true; }
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(v);
+      return true;
+    }
+  } catch (_) { /* 无剪贴板权限：往下走 execCommand */ }
+  /* 网页版兜底：`navigator.clipboard` 在非安全上下文 / 无权限时会拒，
+     这时用一次性的 textarea + `execCommand('copy')`（已废弃但仍是唯一通用退路）。 */
+  try {
+    if (typeof document !== 'undefined' && document.body) {
+      const ta = document.createElement('textarea');
+      ta.value = v;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:-9999px;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand && document.execCommand('copy');
+      ta.remove();
+      return !!ok;
+    }
+  } catch (_) { /* 彻底失败：调用方负责把文本显示出来 */ }
+  return false;
+}
 
 /* ★v15：下载入口统一渲染。
    ————————————————————————————————————————————————————————————————
@@ -3823,22 +3887,46 @@ function isDirectFile(u){ return typeof u === 'string' && DL_FILE_RE.test(u); }
 
      · 真直链（路径以 .zip/.rar/.7z/.exe… 结尾）→ 「⬇ 客户端下载」
          交给壳的内置下载器，落盘并把任务登记进「下载管理」；
-     · 网盘分享页（不是文件）→ 「☁️ 转存下载」
+     · **磁力链**（v28）→ 「🧲 磁力下载」，交给 aria2（取元数据 → 选文件 → 下）；
+     · 迅雷 / 电驴专用链（v28）→ 「🔗 复制」，明确说引擎不支持，不画假按钮；
+     · 网盘分享页（不是文件）→ 「☁️ 打开网盘 · 手动转存」
          复制链接 + 唤起本机网盘客户端，同样登记，状态标「需手动转存」；
      · 「浏览器打开 ↗」保留（次要样式）—— 有些站点的链接只能在浏览器里走。
 
    ★ 如实说明边界（不吹成「什么都能直下」）：实测 MOD 的 200 条链接里
      **199 条是迅雷网盘分享页**，源站没给直链的，壳也变不出来 —— 这种就明确标「转存」，
-     而不是画一个点了没反应、或者偷偷跳浏览器的按钮。 */
+     而不是画一个点了没反应、或者偷偷跳浏览器的按钮。
+   ★v28 用户口径（2026-10-23）：「**网盘还是之前那样，通过跳转自己转存**；
+     如果获取到磁力链则可以拉起 app 那样」。⇒ 网盘不做自动转存（OpenList 保留为可选外挂），
+     磁力链则必须真正喂给引擎 —— 而 v27 及以前它是被当成分享页处理的，**永远不会下载**。 */
 function dlBtns(url, name, label){
   if(!url) return '';
-  const direct = isDirectFile(url);
-  const txt = direct ? (HAS_SHELL ? '⬇ 客户端下载' : '⬇ 下载') : (HAS_SHELL ? '☁️ 转存下载' : '☁️ 复制链接');
+  const kd = dlKindOf(url);
+  const u = esc(url), nm = esc(name || '');
+  /* ★v28：磁力链只给**一个**动作 —— 交给引擎。
+     不给「浏览器打开」次链接：把 `magnet:` 当 href 交出去只会被壳的
+     `setWindowOpenHandler` 拦下或弹系统选择框，点了没反应比没按钮更糟。 */
+  if(kd === 'magnet'){
+    return HAS_SHELL
+      ? `<button type="button" data-dlstart="1" data-url="${u}" data-name="${nm}" title="交给本机 aria2：先取元数据再下，可在「下载管理」里暂停 / 选文件">🧲 磁力下载</button>`
+      : `<button type="button" data-mgcopy="1" data-url="${u}" title="网页版没有 aria2 引擎，只能复制给本机 BT 客户端">🧲 复制磁力链</button>`;
+  }
+  /* 迅雷 / 电驴专用链：引擎不支持，如实标成「复制」，不画假按钮 */
+  if(kd === 'client'){
+    const cnm = /^thunder:/i.test(url) ? '迅雷链' : 'eD2K 链';
+    return `<button type="button" data-mgcopy="1" data-url="${u}" title="这不是 http 直链，本客户端下载引擎不支持；复制后交给对应客户端">🔗 复制${cnm}</button>`;
+  }
+  const direct = (kd === 'file');
+  /* 网盘分享页的文案必须说清「手动转存」—— 原来写「转存下载」听着像会自动转，
+     实际是复制链接 + 唤起本机网盘客户端，一步都不会替用户做。 */
+  const txt = direct
+    ? (HAS_SHELL ? '⬇ 客户端下载' : '⬇ 下载')
+    : (HAS_SHELL ? '☁️ 打开网盘 · 手动转存' : '☁️ 复制转存链接');
   /* ⚠️ `data-dlstart="1"` 必须带值：委托里判的是 `if(b.dataset.dlstart)`，
      写成空属性的话 dataset.dlstart === '' 是 **falsy** ⇒ 按钮点了没反应。 */
-  return `<button type="button" data-dlstart="1" data-url="${esc(url)}" data-name="${esc(name || '')}">${txt}</button>`
-       + ((!direct && olReady()) ? `<button type="button" data-olput="1" data-url="${esc(url)}" data-name="${esc(name || '')}" title="用你本机的 OpenList 把分享链转存、取出直链，然后直接交给下载引擎">↪ ${DLENG.state === 'ready' ? '转存并下载' : '转存到网盘'}</button>` : '')
-       + `<a class="sec" href="${esc(url)}" target="_blank" rel="noopener">${esc(label || '浏览器打开')} ↗</a>`;
+  return `<button type="button" data-dlstart="1" data-url="${u}" data-name="${nm}">${txt}</button>`
+       + ((!direct && olReady()) ? `<button type="button" data-olput="1" data-url="${u}" data-name="${nm}" title="用你本机的 OpenList 把分享链转存、取出直链，然后直接交给下载引擎">↪ ${DLENG.state === 'ready' ? '转存并下载' : '转存到网盘'}</button>` : '')
+       + `<a class="sec" href="${u}" target="_blank" rel="noopener">${esc(label || '浏览器打开')} ↗</a>`;
 }
 
 /* ================= ★v16-H 网盘直链外挂（OpenList / AList） =================
@@ -4296,8 +4384,15 @@ function dlMagnetBind(main){
     }
     if(!/^magnet:\?/i.test(mg)){
       say('不是磁力链', 'warn');
+      /* ★v28：贴进来的是网页链接时，直接给一个「打开它」的出口 ——
+         用户口径是「网盘通过跳转自己转存」，那就别只报错、什么都不给。 */
+      const isHttp = /^https?:\/\//i.test(mg);
       box.innerHTML = '<div class="olres bad">磁力链必须以 <code>magnet:?</code> 开头。'
-        + '网盘分享页（迅雷 / 百度 / 夸克）<b>不是</b>磁力链，下载引擎也打不开它们。</div>';
+        + (isHttp
+            ? '你贴的是<b>网页链接</b>：网盘分享页要在浏览器里<b>自己转存</b>，下载引擎打不开它。'
+              + '<div class="lks"><a class="sec" href="' + esc(mg) + '" target="_blank" rel="noopener">打开这个链接 ↗</a></div>'
+            : '网盘分享页（迅雷 / 百度 / 夸克）<b>不是</b>磁力链，下载引擎也打不开它们。')
+        + '</div>';
       return;
     }
     if(!SHELL || typeof SHELL.dlMagnetPreview !== 'function'){
@@ -4555,18 +4650,41 @@ function olBind(scope){
 
 /* 真直链 → 交给壳的内置下载器；网盘 → 登记为 manual 并复制链接 + 唤起客户端 */
 function startDownload(o){
+  /* ★v28：**磁力链先分流**。
+     它必须交给引擎（aria2 支持 magnet：先取元数据、再按 `select-file` 下），
+     绝不能进下面 netdisk 那条「复制链接 + 唤起网盘客户端」的路 ——
+     v27 及以前就是这个 bug：拿到磁力链会当成分享页，永远不会下载。
+     `startMagnet` 内部会自己登记任务，所以这里**直接 return**，不再 `dlJobAdd` 第二次。 */
+  const kd = dlKindOf(o.url);
+  if (kd === 'magnet' && HAS_SHELL && SHELL && typeof SHELL.startDownload === 'function'){
+    return startMagnet(o.url, o.sel || [], o.name);
+  }
   const j = dlJobAdd(o);
+  /* ★v28：任务 kind **以链接形态为准**，不信任调用方传进来的值 ——
+     `renderDownloads` 靠它决定图标与「打开网盘」按钮是否出现。 */
+  j.kind = kd;
   if(!HAS_SHELL){
     j.state = 'manual';
-    j.err = '网页版没有内置下载器，请复制链接用浏览器下载';
+    j.err = kd === 'magnet'
+      ? '网页版没有 aria2 引擎，磁力链只能复制给本机 BT 客户端'
+      : '网页版没有内置下载器，请复制链接用浏览器下载';
+    if(kd !== 'file') copyAny(o.url);
     renderDownloads(document.getElementById('main'));
     return j;
   }
-  if(o.kind === 'netdisk' || !isDirectFile(o.url)){
+  if(kd === 'netdisk' || kd === 'client'){
     j.state = 'manual';
-    if(o.url && SHELL.copyText) SHELL.copyText(o.url);
-    if(o.url && SHELL.openNetdisk) SHELL.openNetdisk(o.url);
-    shellSay('网盘链接已复制，并尝试唤起本机客户端');
+    if(kd === 'client'){
+      /* 迅雷 / 电驴专用链：复制是唯一能做的事，且必须说清「不是我们下不了，
+         是这条链本身只认对应客户端」—— 别让用户以为是软件坏了。 */
+      j.err = '专用链（thunder:// / ed2k://）本客户端引擎不支持，已复制';
+      copyAny(o.url);
+      shellSay('专用链已复制，请交给对应的下载客户端');
+    } else {
+      if(o.url) copyAny(o.url);
+      if(o.url && SHELL.openNetdisk) SHELL.openNetdisk(o.url);
+      shellSay('网盘链接已复制，并尝试唤起本机客户端（转存要你手动点）');
+    }
     renderDownloads(document.getElementById('main'));
     return j;
   }
@@ -4587,7 +4705,18 @@ if(SHELL && typeof SHELL.onDownload === 'function'){
   SHELL.onDownload(msg => {
     const j = (DL_JOBS || []).find(x => x.id === msg.id);
     if(!j) return;
-    Object.assign(j, msg);
+    /* ★★v28 实拍抓出的真 bug（一条断言也拦不住，因为它只在**引擎回推**时才发生）：
+       进度消息里的 `url` / `name` / `dest` 来自 aria2 的 `files[0].uris[0].uri`，
+       而磁力任务在**取元数据阶段** `uris` 就是空的 ⇒ `Object.assign(j, msg)` 会把页面
+       自己存的 magnet 地址**覆盖成空串**。后果全在「事后」才发作：
+         · 「复制链接」复制到一个空串；
+         · 「重试」拿空 url 去提交，必然失败；
+         · 重启后 `dlReconcile` 按 url 匹配也对不上，任务被判「不在引擎中」。
+       实测证据：探针任务重开后 `{"url":"","kind":"magnet","state":"fail","dest":"[METADATA]…"}`。
+       ⇒ 空值一律**不覆盖**（保留页面已有的值）。 */
+    const patch = Object.assign({}, msg);
+    for(const k of ['url', 'name', 'dest']){ if(!patch[k]) delete patch[k]; }
+    Object.assign(j, patch);
     dlJobTouch(j);        /* ★v24 只有状态变了才落盘（进度 tick 不写） */
     if(cur === 'downloads') renderDownloads(document.getElementById('main'));
     refreshCounts();
@@ -4598,7 +4727,7 @@ if(SHELL && typeof SHELL.onDownload === 'function'){
    ★v16-H：`data-olput`（转存到网盘）**必须挂进同一个 closest**，否则点了没反应
    —— 页面里没有第二处 download 委托，漏在这里就是死按钮。 */
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-dlstart],[data-dlcopy],[data-dlopen],[data-dlcancel],[data-dlfile],[data-dldir],[data-dlretry],[data-dlpause],[data-dlresume],[data-dlremove],[data-dlpath],[data-olput],[data-exopen]');
+  const b = e.target.closest('[data-dlstart],[data-dlcopy],[data-dlopen],[data-dlcancel],[data-dlfile],[data-dldir],[data-dlretry],[data-dlpause],[data-dlresume],[data-dlremove],[data-dlpath],[data-olput],[data-mgcopy],[data-exopen]');
   if(!b) return;
   /* ★v16-H：转存分支**必须排在下面 `if(!job) return` 之前** ——
      它是「链接上的动作」，身上没有任何下载任务 id，落到那条判空就被静默挡掉了。 */
@@ -4642,7 +4771,15 @@ document.addEventListener('click', e => {
   const job = jid ? (DL_JOBS || []).find(x => x.id === jid) : null;
   if(b.dataset.dlstart){
     const url = b.dataset.url || '';
-    startDownload({ url, name: b.dataset.name || '下载', kind: isDirectFile(url) ? 'file' : 'netdisk' });
+    startDownload({ url, name: b.dataset.name || '下载' });
+    e.preventDefault(); e.stopPropagation(); return;
+  }
+  /* ★v28：磁力 / 专用链的「复制」—— 它**没有任务 id**（不是某个 job 的按钮），
+     所以必须在 `if(!job) return` 之前处理，否则会被那一行直接吞掉。 */
+  if(b.dataset.mgcopy){
+    const u = b.dataset.url || '';
+    const ok = copyAny(u);
+    shellSay(ok ? ('已复制：' + u.slice(0, 56) + (u.length > 56 ? '…' : '')) : ('复制失败，请手动复制：' + u.slice(0, 80)));
     e.preventDefault(); e.stopPropagation(); return;
   }
   if(!job) return;
@@ -5747,7 +5884,7 @@ function dlTabHTML(k, d){
            https://patch1.ventacorius.com/2024/ALI213-2077-243487.rar）⇒ 交给壳直接下。 */
         if (f.direct) lk.push(dlBtns(f.direct, it.game || it.title, '存档包'));
         for (const n of (f.netdisk || [])) lk.push(dlBtns(n.url, it.game || it.title, n.kind || '网盘'));
-        if (f.ed2k) lk.push(`<a class="na">eD2K</a>`);
+        if (f.ed2k) lk.push(dlBtns(f.ed2k, it.game || it.title, 'eD2K'));
         if (it.sourceUrl) lk.push(`<a class="sec" href="${esc(it.sourceUrl)}" target="_blank" rel="noopener">原页</a>`);
         const md = [];
         if (it.game) md.push(esc(it.game));

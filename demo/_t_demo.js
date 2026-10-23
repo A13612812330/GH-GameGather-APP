@@ -1443,11 +1443,21 @@ ok('v15下载入口：本体 / Mod / 存档 三处都改用了 dlBtns',
 ok('v15下载入口：.lk button 与 .lk a.sec 都有样式（否则按钮是裸的）',
    /\.dlrow \.lk button\{/.test(code) && /\.dlrow \.lk a\.sec\{/.test(code));
 
-/* ⑥ 任务模型与状态集合完整（下载管理页按 state 决定按钮） */
-ok('v15下载：任务状态集合 = waiting/running/done/fail/pause/manual',
-   /waiting:'排队中'[\s\S]{0,200}?manual:'需手动转存'/.test(code));
+/* ⑥ 任务模型与状态集合完整（下载管理页按 state 决定按钮）
+   ★v28：`manual` 的文案改成**按 kind 分岔**（网盘=需手动转存 / 专用链=需本机对应客户端），
+     所以不能再要求「manual 后面紧跟字面量 需手动转存」。改为在 **stTxt 映射块内部**逐键校验 ——
+     这才是原断言真正想守的东西（六个状态一个都不能少），也不会因为改文案再假红。 */
+{
+  const m = code.match(/const stTxt = \{([\s\S]{0,420}?)\}\[j\.state\]/);
+  const body = m ? m[1] : '';
+  const miss = ['waiting', 'running', 'done', 'fail', 'pause', 'manual'].filter(k => !new RegExp('(^|[,{\\s])' + k + ':').test(body));
+  ok('v15下载：任务状态集合 = waiting/running/done/fail/pause/manual',
+     !!m && miss.length === 0, m ? ('缺 ' + miss.join(',')) : '没找到 stTxt 映射');
+  ok('v28：manual 文案按 kind 分岔（专用链 ≠ 转存，不能一个词盖两件事）',
+     /manual:\(j\.kind === 'client' \? '需本机对应客户端' : '需手动转存'\)/.test(body), body.slice(0, 80));
+}
 ok('v15下载：壳推进度经 onDownload 回推，且只在下载页可见时重绘',
-   /SHELL\.onDownload\(msg => \{[\s\S]{0,260}?if\(cur === 'downloads'\) renderDownloads/.test(code));
+   /SHELL\.onDownload\(msg => \{[\s\S]{0,900}?if\(cur === 'downloads'\) renderDownloads/.test(code));
 ok('v15下载：下载按钮走 document 级事件委托（只绑一次）',
    /document\.addEventListener\('click', e => \{[\s\S]{0,200}?data-dlstart/.test(code));
 /* ★ manual 的成因有两类，按钮不能只给网盘那类（2026-10-16 实拍发现）：
@@ -1456,6 +1466,73 @@ ok('v15下载：下载按钮走 document 级事件委托（只绑一次）',
    用户既不能复制也不能重试。⇒ 复制链接必须按 state 给。 */
 ok('v15下载：manual 态总是给「复制链接」（非网盘的 manual 任务原来拿不到任何操作）',
    /j\.state === 'manual' && j\.url[\s\S]{0,150}?data-dlcopy/.test(code));
+
+/* ================= ★v28 链接四分类：网盘跳转 / 磁力交给引擎 =================
+   用户 2026-10-23 口径：「网盘还是之前那样，通过跳转自己转存；
+   如果获取到磁力链则可以拉起 app 那样」。
+   ⇒ 磁力链**必须**进引擎，网盘分享页**必须**是跳转。
+   下面这些是**行为断言**（真调函数），不是源码字符串匹配 —— 正则只能证明「写了」，
+   证明不了「判对了」。 */
+{
+  const K = (u) => win.eval('dlKindOf(' + JSON.stringify(u) + ')');
+  const cases = [
+    ['magnet:?xt=urn:btih:0123456789abcdef', 'magnet'],
+    ['MAGNET:?xt=urn:btih:abc', 'magnet'],
+    ['https://pan.xunlei.com/s/VNxxxxx', 'netdisk'],
+    ['https://www.jidiyouxi.com/topic/detail/12345', 'netdisk'],
+    ['https://patch1.ventacorius.com/2024/ALI213-2077.rar', 'file'],
+    ['https://a.com/x.7z?token=1', 'file'],
+    ['thunder://QUFodHRwOi8vZXhhbXBsZS5jb20vYS56aXA=', 'client'],
+    ['ed2k://|file|a.rar|1024|ABCD|/', 'client'],
+    ['', 'netdisk'],
+  ];
+  const bad = cases.filter(([u, want]) => K(u) !== want);
+  ok('v28：dlKindOf 四分类判对（磁力 / 网盘页 / 真直链 / 专用链）',
+     bad.length === 0, bad.map(([u, w]) => u.slice(0, 26) + '→' + K(u) + '(want ' + w + ')').join(' | ') || '9 条全对');
+
+  /* ★★ 反证型：磁力链**不许**再落进网盘分支。
+     判据用「startDownload 里磁力分流必须出现在 dlJobAdd 之前」——
+     顺序反过来的话，磁力会先被登记成一条任务，然后才被判成磁力，
+     结果是「下载管理里多一条永远在等待的网盘任务」。这是本轮修的正是它。 */
+  const iMag = code.indexOf("if (kd === 'magnet' && HAS_SHELL");
+  const iAdd = code.indexOf('const j = dlJobAdd(o);', code.indexOf('function startDownload'));
+  ok('v28：startDownload 里磁力分流在登记任务**之前**（否则会多出一条网盘任务）',
+     iMag > -1 && iAdd > -1 && iMag < iAdd, 'magnet@' + iMag + ' / add@' + iAdd);
+  ok('v28：磁力分流真的交给 startMagnet（不是自己再写一份下载逻辑）',
+     /if \(kd === 'magnet' && HAS_SHELL[\s\S]{0,120}?return startMagnet\(/.test(code));
+
+  /* 磁力按钮：网页版没有任何可点的次链接（`magnet:` 当 href 交出去是死链） */
+  const bMag = win.eval('dlBtns("magnet:?xt=urn:btih:00","测试磁力")');
+  ok('v28：磁力按钮走 data-mgcopy（网页版只复制，不假装能下）',
+     /data-mgcopy="1"/.test(bMag) && /复制磁力链/.test(bMag));
+  ok('v28：磁力按钮不给 target=_blank 次链接（magnet: 当 href 是死链）',
+     !/target="_blank"/.test(bMag), bMag.slice(0, 90));
+
+  /* 网盘按钮：文案必须写「转存」，且原文保留「浏览器打开」出口 */
+  const bNd = win.eval('dlBtns("https://pan.xunlei.com/s/VNx","测试网盘","网盘")');
+  ok('v28：网盘按钮文案含「转存」，且保留浏览器打开出口',
+     /转存/.test(bNd) && /target="_blank"/.test(bNd), bNd.slice(0, 90));
+
+  /* 专用链：只给复制，且文案点名是哪种链 —— 不能和网盘共用一套词 */
+  const bCl = win.eval('dlBtns("thunder://QUFodHRw","测试","下载")');
+  ok('v28：迅雷专用链只给「复制」，且明说是迅雷链',
+     /data-mgcopy="1"/.test(bCl) && /迅雷链/.test(bCl) && !/target="_blank"/.test(bCl));
+
+  /* 存档页的 eD2K 原来是个**点了没反应的死标签**（<a class="na">eD2K</a>） */
+  ok('v28：存档的 eD2K 改成真能复制的按钮（原来是死标签）',
+     !/<a class="na">eD2K<\/a>/.test(code) && /dlBtns\(f\.ed2k/.test(code));
+
+  /* ===== ★v28 实拍抓出来的真 bug：进度回推把 url 覆盖成空 =====
+     磁力任务在「取元数据」阶段 aria2 的 `files[0].uris` 是空的 ⇒ 直接 Object.assign
+     会把页面存的 magnet 地址覆盖成 ''，于是「复制链接 / 重试 / 重启后对账」全部失效。
+     实测证据：探针任务重开后 `{"url":"","kind":"magnet","state":"fail"}`。 */
+  ok('v28：进度回推不覆盖空的 url/name/dest（磁力取元数据阶段 uris 为空）',
+     /for\(const k of \['url', 'name', 'dest'\]\)\{ if\(!patch\[k\]\) delete patch\[k\]; \}/.test(code));
+  /* 对账先按 gid 认 —— 磁力任务 url 为空时，只有 gid 能把它和引擎里那条对上，
+     否则「重启后活着的任务被判成不在引擎中」。 */
+  ok('v28：对账先按 gid 匹配、再退 url（磁力重启后 url 为空）',
+     /byGid\.get\(String\(j\.gid\)\)\) \|\| byUrl\.get/.test(code));
+}
 
 /* ⑦ 实时层：PC 侧六路并发拉取，缺一不影响其它（各自回落快照） */
 ok('v15实时：refreshLive 一次并发拉 6 个实时接口',
@@ -2875,7 +2952,7 @@ ok('v16分页：pgTotal 无筛选时取上游总量、有筛选时取命中数',
     && /gid:j\.gid, at:j\.at,/.test(code));
   ok('v24持久化：**只在状态变化时**写（`dlJobTouch` 比对 `_ls`），且进度回调确实调了它',
     /function dlJobTouch\(j\)\{[\s\S]{0,120}?if\(j\._ls === j\.state\) return;/.test(code)
-    && /Object\.assign\(j, msg\);[\s\S]{0,90}?dlJobTouch\(j\);/.test(code));
+    && /Object\.assign\(j, patch\);[\s\S]{0,140}?dlJobTouch\(j\);/.test(code));
   ok('v24持久化：读入**必须有 try/catch**（localStorage 坏了不能把启动搞挂）',
     /function dlJobsLoad\(\)\{[\s\S]{0,700}?catch\(e\)\{[\s\S]{0,200}?return 0;/.test(code));
   ok('v24持久化：`dlJobsLoad()` 在首次 `render()` **之前**（否则侧栏计数先按 0 画一次）',
@@ -2892,7 +2969,7 @@ ok('v16分页：pgTotal 无筛选时取上游总量、有筛选时取命中数',
   ok('v24对账：界面上有、引擎里**没有**的 ⇒ 标 fail 并写明原因（不假装还在下）',
     /重启后未在引擎中找到该任务（可能已被清理）/.test(code));
   ok('v24对账：引擎里有、界面没有的 ⇒ 补一条（上次运行留下的）',
-    /if\(DL_JOBS\.some\(j => String\(j\.url \|\| ''\) === String\(t\.url\)\)\) continue;/.test(code));
+    /if\(DL_JOBS\.some\(j => String\(j\.url \|\| ''\) === String\(t\.url\)/.test(code));
 
   /* 行为级：连续三次同状态调用只应写一次，状态真变了再写一次 ⇒ 共 2 次 */
   const touchN = win.eval(`(function(){
