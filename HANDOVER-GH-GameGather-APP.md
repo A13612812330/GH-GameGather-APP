@@ -21,13 +21,30 @@
 |---|---|---|
 | 读代码 / 改代码 / 让 AI 帮你继续开发 | ✅ **够了** | `git clone` 即可，无构建步骤 |
 | 看界面长什么样（离线原型） | ✅ **够了** | 双击 `demo/index.html`，0 依赖，走 `demo/data.js` 快照（2026-10-15 打包时点） |
-| 跑原生桌面窗口 | ❌ 不够 | ① `cd electron && npm i`（拉 Electron 39.8.10，约 200 MB）② **上游 `game-aggregator`**（不在本仓库） |
-| 有实时数据（搜索 / 详情 / 评分 / 榜单刷新） | ❌ 不够 | **只能由上游提供**，没有它整站退化为离线快照 |
-| 自己打 exe | ❌ 不够 | 上面两样 + Python 3.11+（跑 `electron/pack.py`） |
-| 直接双击就用 | ❌ 不够 | 要拿 `dist/GameIntel/` 整个目录（591.3 MB），或等一个安装包（N-21 未做） |
+| 跑原生桌面窗口 | ⚠️ 差一步 | `cd electron && npm i`（拉 Electron 39.8.10，约 200 MB）+ **上游**（见下） |
+| 有实时数据（搜索 / 详情 / 评分 / 榜单刷新） | ⚠️ 差一步 | 上游已单独发布 → [GH-GameGather-UPSTREAM](https://github.com/A13612812330/GH-GameGather-UPSTREAM) |
+| 自己打 exe | ⚠️ 差一步 | 上面两样 + Python 3.11+（跑 `electron/pack.py`） |
+| 直接双击就用 | ✅ **够了（另一条路）** | 下 [Release v28 成品包](https://github.com/A13612812330/GH-GameGather-APP/releases/tag/v28)，262 MB，解压双击 |
 
-> **结论一句话**：代码可以立刻交接，**数据与成品不能**。真正的缺口只有一个 —— 上游 `game-aggregator`。
-> 它是独立项目，运行时由壳以子进程拉起（`GAMEHUB_ROOT` 指定路径），本仓库只读依赖它。
+> **结论一句话**：**代码 + 数据 + 成品三样都在 GitHub 上了，只是分在三个地方。**
+> 本仓库只有代码；上游在 `GH-GameGather-UPSTREAM`；成品在 Releases。
+> 只想「跑起来看看」的人走 Release，只想「改代码」的人 clone 本仓。
+
+### 0.2 三条复刻路线（照抄即可）
+
+**路线 A · 只想用**：下 Release 的 zip → 完整解压 → 双击 `GameIntel/GameIntel.exe`。
+
+**路线 B · 要跑开发壳**：
+
+```bash
+git clone https://github.com/A13612812330/GH-GameGather-APP.git
+git clone https://github.com/A13612812330/GH-GameGather-UPSTREAM.git upstream
+cd GH-GameGather-APP/electron && npm install
+export GAMEHUB_ROOT="$(cd ../../upstream && pwd)"
+env -u ELECTRON_RUN_AS_NODE ./node_modules/electron/dist/electron.exe .
+```
+
+**路线 C · 要出 exe**：在路线 B 基础上 `python electron/pack.py`，产出 `dist/GameIntel/`（约 2~4 分钟）。
 
 ---
 
@@ -51,13 +68,13 @@
 
 | 内容 | 为什么不入库 | 没有它会怎样 |
 |---|---|---|
-| **上游聚合服务** `game-aggregator` | 独立项目、独立维护，本仓库只读依赖 | **跑不起实时库**：只能看 `demo/data.js` 的离线快照。这是最大的一条 |
+| **上游聚合服务** `game-aggregator` | 独立项目、独立维护，本仓库只读依赖 | **跑不起实时库**：只能看 `demo/data.js` 的离线快照。**已单独发布**：[GH-GameGather-UPSTREAM](https://github.com/A13612812330/GH-GameGather-UPSTREAM)（123 文件 / 109.6 MB，`npm i` 后 `PORT=8199 node server.js` 即可） |
 | **Electron 发行版** `electron/node_modules/` | 体积大，可重装 | 打不了包、开不了原生窗口（看原型不受影响） |
-| **成品** `dist/GameIntel/` | **10,100 个文件 / 591.3 MB** | 拿不到就自己跑一次打包（约 2~4 分钟） |
+| **成品** `dist/GameIntel/` | **10,100 个文件 / 591.3 MB** | 直接下 [Release v28](https://github.com/A13612812330/GH-GameGather-APP/releases/tag/v28)（262 MB zip），或自己跑一次打包（约 2~4 分钟） |
 | 实拍截图 `exe-preview/shots/` | 77 张 / 35 MB，可重拍 | 只有 `exe-preview/index.html` 里会有空图位 |
 | `_ref/` `_probe/` `_audit/` `_archive/` | 本地过程材料 | 不影响运行 |
 
-> **移交时另外单独给的两样**：① 上游 `game-aggregator` 目录；② `dist/GameIntel/` 整个目录（如果不想自己打包）。
+> **三样东西分三处**：代码 → 本仓库；数据服务 → `GH-GameGather-UPSTREAM`；成品 → Releases。
 
 ---
 

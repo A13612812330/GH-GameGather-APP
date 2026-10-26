@@ -44,6 +44,8 @@ __pycache__/
 
 # ── 移交导出物（bundle / 源码 zip，2026-10-26 起）────────
 /_handover/
+# 上游精简版发布目录：本身是独立仓库（GH-GameGather-UPSTREAM），不并入本仓
+/upstream-publish/
 
 # ── 杂项 ────────────────────────────────────────────────
 *.log

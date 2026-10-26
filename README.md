@@ -50,6 +50,17 @@ flowchart LR
 3. 上游 `server.js` 是**实时接口唯一来源**，必须进包；但**不把 demo 拷进上游 `public/`**。
 4. 壳源码在 `resources/app/`、**不在 exe 里** ⇒ 改壳后 exe 的 md5 不变，判新旧要看包内 `intel/index.html`。
 
+### 三个入口，别搞混
+
+| 你想要 | 去哪 |
+|---|---|
+| **直接能用**（不装任何东西） | [Releases · v28 成品包](https://github.com/A13612812330/GH-GameGather-APP/releases/tag/v28) —— 262 MB zip，解压双击 |
+| **读 / 改界面与壳** | 本仓库（`demo/` + `electron/`），`npm i` 后即可跑、可打包 |
+| **改数据服务 / 要实时数据** | [GH-GameGather-UPSTREAM](https://github.com/A13612812330/GH-GameGather-UPSTREAM) —— 配套 Express 服务 + 93.6 MB JSON 索引快照 |
+
+> 本仓库**不含**上游服务与 Electron 运行时，也不含成品 —— 所以「只 clone 这一个仓库」跑不出完整 App，
+> 判定表见 [`HANDOVER` §0.1](./HANDOVER-GH-GameGather-APP.md)。
+
 ---
 
 ## 三、目录
