@@ -1,5 +1,7 @@
 # GH-GameGather APP
 
+> 📚 **本文档属于 GH 系列交接项目。** 总入口（全部 10 个仓库索引、可用性实测、可复制的 AI Agent prompt）：https://github.com/A13612812330/GH-Handover
+
 本地优先的 **PC / 手游情报站 + 资源检索 + 桌面下载管理**。最终产物是一个双击即用的 Windows 桌面应用。
 
 ### 只要记住这一个链接
