@@ -36,6 +36,9 @@ __pycache__/
 /exe-preview/shots*/
 /exe-preview/crops/
 
+# ── 移交导出物（bundle / 源码 zip，2026-10-26 起）────────
+/_handover/
+
 # ── 杂项 ────────────────────────────────────────────────
 *.log
 /.wbapp_*.genie
