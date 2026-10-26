@@ -71,14 +71,15 @@ flowchart LR
 │  ├─ vendor/aria2/           aria2c.exe 5.4 MB + GPLv2 三件（2026-10-26 起入库）
 │  ├─ _t_shell.js             壳契约断言（73 条）
 │  └─ _t_aria2.js             引擎断言（27 条）
-├─ HANDOVER-GH-GameGather-APP.md  移交说明（接手先读这一份）
 ├─ exe-preview/index.html     版本实拍档案页（截图未入库，见 §六）
+├─ HANDOVER-GH-GameGather-APP.md  移交说明（接手先读这一份）
 ├─ SOP-游戏情报客户端.md       规范与红线
 ├─ PLAN-游戏情报客户端.md      方案与模块（M0–M13）
 ├─ NEXT-游戏情报客户端.md      待办与路线（P0–P3）
-├─ PACK-GameHub-exe.md        exe 打包方案与逐版记录（§一 ~ §二十六）
-└─ REF-迅雷游戏助手-逆向分析.md  第三方成品逆向（只学架构，不抄代码与素材）
+└─ PACK-GameHub-exe.md        exe 打包方案与逐版记录
 ```
+
+> 公开仓库**不含**内部工作记忆与第三方成品逆向分析材料 —— 这两类留在维护者本地，不进版本库（见 `.gitignore` 末段）。
 
 ---
 
