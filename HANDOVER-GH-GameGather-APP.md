@@ -2,6 +2,9 @@
 
 > 建立：**2026-10-26**　｜　移交时版本：**v28**　｜　代码状态：三套断言全绿（803 + 73 + 27）
 >
+> **唯一入口**：**https://github.com/A13612812330/GH-GameGather-APP**
+> 代码、成品包（Releases）、数据服务（README 首页有链接）都从这一个地址进入，不需要再记第二个。
+>
 > 写给**接手的人**。读完 §1 与 §2 就能跑起来，§7 是一定会踩的坑。
 > 更细的实现决策在 `PACK-GameHub-exe.md`（逐版记录）、`NEXT-游戏情报客户端.md`（待办与现状锚点）。
 
@@ -24,10 +27,10 @@
 | 跑原生桌面窗口 | ⚠️ 差一步 | `cd electron && npm i`（拉 Electron 39.8.10，约 200 MB）+ **上游**（见下） |
 | 有实时数据（搜索 / 详情 / 评分 / 榜单刷新） | ⚠️ 差一步 | 上游已单独发布 → [GH-GameGather-UPSTREAM](https://github.com/A13612812330/GH-GameGather-UPSTREAM) |
 | 自己打 exe | ⚠️ 差一步 | 上面两样 + Python 3.11+（跑 `electron/pack.py`） |
-| 直接双击就用 | ✅ **够了（另一条路）** | 下 [Release v28 成品包](https://github.com/A13612812330/GH-GameGather-APP/releases/tag/v28)，262 MB，解压双击 |
+| 直接双击就用 | ✅ **够了（另一条路）** | 下 [Releases · 最新成品包](https://github.com/A13612812330/GH-GameGather-APP/releases/latest)，262 MB，**整个解压**后双击 `GameIntel.exe` |
 
-> **结论一句话**：**代码 + 数据 + 成品三样都在 GitHub 上了，只是分在三个地方。**
-> 本仓库只有代码；上游在 `GH-GameGather-UPSTREAM`；成品在 Releases。
+> **结论一句话**：**代码 + 数据 + 成品三样都在 GitHub 上了，一个主仓链接全部可达。**
+> 代码 = 本仓库；成品 = 本仓库 Releases；数据 = `GH-GameGather-UPSTREAM`（README 顶部表格里有直达链接）。
 > 只想「跑起来看看」的人走 Release，只想「改代码」的人 clone 本仓。
 
 ### 0.2 三条复刻路线（照抄即可）
@@ -70,7 +73,7 @@ env -u ELECTRON_RUN_AS_NODE ./node_modules/electron/dist/electron.exe .
 |---|---|---|
 | **上游聚合服务** `game-aggregator` | 独立项目、独立维护，本仓库只读依赖 | **跑不起实时库**：只能看 `demo/data.js` 的离线快照。**已单独发布**：[GH-GameGather-UPSTREAM](https://github.com/A13612812330/GH-GameGather-UPSTREAM)（123 文件 / 109.6 MB，`npm i` 后 `PORT=8199 node server.js` 即可） |
 | **Electron 发行版** `electron/node_modules/` | 体积大，可重装 | 打不了包、开不了原生窗口（看原型不受影响） |
-| **成品** `dist/GameIntel/` | **10,100 个文件 / 591.3 MB** | 直接下 [Release v28](https://github.com/A13612812330/GH-GameGather-APP/releases/tag/v28)（262 MB zip），或自己跑一次打包（约 2~4 分钟） |
+| **成品** `dist/GameIntel/` | **10,100 个文件 / 591.3 MB** | 直接下 [Releases · 最新成品包](https://github.com/A13612812330/GH-GameGather-APP/releases/latest)（262 MB zip），或自己跑一次打包（约 2~4 分钟） |
 | 实拍截图 `exe-preview/shots/` | 77 张 / 35 MB，可重拍 | 只有 `exe-preview/index.html` 里会有空图位 |
 | `_ref/` `_probe/` `_audit/` `_archive/` | 本地过程材料 | 不影响运行 |
 

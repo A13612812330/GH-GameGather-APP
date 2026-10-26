@@ -1,14 +1,28 @@
 # GH-GameGather APP
 
-> 原名「游戏情报客户端 / GameIntel」，**2026-10-26 定名 GH-GameGather APP**（移交版）。
-> 代码目录名、exe 名与包内路径仍沿用 `GameIntel`，未做重命名 —— 改名会让打包脚本与既有验证指纹全部失效，
-> 详见 [`HANDOVER-GH-GameGather-APP.md`](./HANDOVER-GH-GameGather-APP.md) §六。
+本地优先的 **PC / 手游情报站 + 资源检索 + 桌面下载管理**。最终产物是一个双击即用的 Windows 桌面应用。
 
-本地优先的 **PC / 手游情报站 + 资源检索 + 桌面下载管理**。最终产物是一个双击即用的 Windows 桌面应用：
-`dist\GameIntel\GameIntel.exe`。
+### 只要记住这一个链接
+
+## 👉 https://github.com/A13612812330/GH-GameGather-APP
+
+打开它，下面四件事都能从这里走到，不需要再记第二个地址：
+
+| 你想干什么 | 从这里点 | 说明 |
+|---|---|---|
+| **直接就能用**（不装任何东西） | [**Releases · 最新成品包**](../../releases/latest) | 262 MB zip → **整个文件夹解压** → 双击 `GameIntel.exe`。⚠️ **别只拷 exe**（会报 ICU 错误） |
+| **读代码 / 改界面与壳** | 本仓库 `demo/` + `electron/` | `git clone` 后 `cd electron && npm i` |
+| **要实时数据 / 改数据服务** | [GH-GameGather-UPSTREAM](https://github.com/A13612812330/GH-GameGather-UPSTREAM) | 配套 Express 服务 + 93.6 MB JSON 索引快照 |
+| **只想看看界面长什么样** | 双击 `demo/index.html` | 0 依赖、不联网，读离线快照 |
+
+> ⚠️ **单 clone 本仓库跑不出完整 App** —— 本仓不含上游数据服务、Electron 运行时与成品。
+> 逐项判定表见 [`HANDOVER` §0.1](./HANDOVER-GH-GameGather-APP.md)，三条复刻路线见 §0.2。
 
 > **只做信息聚合与索引** —— 不托管、不分发任何游戏文件。所有资源条目都指向原始出处，
 > 下载能力只覆盖**磁力/BT 与真实直链**。
+
+> **关于名字**：原名「游戏情报客户端 / GameIntel」，2026-10-26 定名 GH-GameGather APP。代码目录名、exe 名
+> 与包内路径仍沿用 `GameIntel`，未做重命名 —— 改名会让打包脚本与既有验证指纹全部失效，见 [`HANDOVER` §六](./HANDOVER-GH-GameGather-APP.md)。
 
 ---
 
@@ -49,17 +63,6 @@ flowchart LR
 2. 端口**不能写死 8123**：壳的上游会因 `EADDRINUSE` 自动 +1，页面取 `SHELL.describe().listenPort` 优先、取不到才退回。
 3. 上游 `server.js` 是**实时接口唯一来源**，必须进包；但**不把 demo 拷进上游 `public/`**。
 4. 壳源码在 `resources/app/`、**不在 exe 里** ⇒ 改壳后 exe 的 md5 不变，判新旧要看包内 `intel/index.html`。
-
-### 三个入口，别搞混
-
-| 你想要 | 去哪 |
-|---|---|
-| **直接能用**（不装任何东西） | [Releases · v28 成品包](https://github.com/A13612812330/GH-GameGather-APP/releases/tag/v28) —— 262 MB zip，解压双击 |
-| **读 / 改界面与壳** | 本仓库（`demo/` + `electron/`），`npm i` 后即可跑、可打包 |
-| **改数据服务 / 要实时数据** | [GH-GameGather-UPSTREAM](https://github.com/A13612812330/GH-GameGather-UPSTREAM) —— 配套 Express 服务 + 93.6 MB JSON 索引快照 |
-
-> 本仓库**不含**上游服务与 Electron 运行时，也不含成品 —— 所以「只 clone 这一个仓库」跑不出完整 App，
-> 判定表见 [`HANDOVER` §0.1](./HANDOVER-GH-GameGather-APP.md)。
 
 ---
 
