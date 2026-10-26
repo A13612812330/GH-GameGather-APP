@@ -1,12 +1,12 @@
 # GH-GameGather APP
 
-> 📚 **本文档属于 GH 系列交接项目。** 总入口（全部 10 个仓库索引、可用性实测、可复制的 AI Agent prompt）：https://github.com/A13612812330/GH-Handover
+> 📚 **本文档属于 GH 系列交接项目。** 总入口（全部 10 个仓库索引、可用性实测、可复制的 AI Agent prompt）：https://github.com/GHZS-Project/GH-Handover
 
 本地优先的 **PC / 手游情报站 + 资源检索 + 桌面下载管理**。最终产物是一个双击即用的 Windows 桌面应用。
 
 ### 只要记住这一个链接
 
-## 👉 https://github.com/A13612812330/GH-GameGather-APP
+## 👉 https://github.com/GHZS-Project/GH-GameGather-APP
 
 打开它，下面四件事都能从这里走到，不需要再记第二个地址：
 
@@ -14,7 +14,7 @@
 |---|---|---|
 | **直接就能用**（不装任何东西） | [**Releases · 最新成品包**](../../releases/latest) | 262 MB zip → **整个文件夹解压** → 双击 `GameIntel.exe`。⚠️ **别只拷 exe**（会报 ICU 错误） |
 | **读代码 / 改界面与壳** | 本仓库 `demo/` + `electron/` | `git clone` 后 `cd electron && npm i` |
-| **要实时数据 / 改数据服务** | [GH-GameGather-UPSTREAM](https://github.com/A13612812330/GH-GameGather-UPSTREAM) | 配套 Express 服务 + 93.6 MB JSON 索引快照 |
+| **要实时数据 / 改数据服务** | [GH-GameGather-UPSTREAM](https://github.com/GHZS-Project/GH-GameGather-UPSTREAM) | 配套 Express 服务 + 93.6 MB JSON 索引快照 |
 | **只想看看界面长什么样** | 双击 `demo/index.html` | 0 依赖、不联网，读离线快照 |
 
 > ⚠️ **单 clone 本仓库跑不出完整 App** —— 本仓不含上游数据服务、Electron 运行时与成品。
