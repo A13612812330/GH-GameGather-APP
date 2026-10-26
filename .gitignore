@@ -5,8 +5,9 @@
 
 # ── 依赖与第三方二进制 ──────────────────────────────────
 /electron/node_modules/
-# aria2c.exe 是 GPLv2 第三方二进制，不随仓库分发；打包脚本会从本机 vendor/ 取。
-/electron/vendor/
+# aria2c.exe 是 GPLv2 第三方二进制。2026-10-26 移交时改为**入库**：
+# 同事 clone 后要能直接打包，且 GPLv2 分发本就要求随附授权文件。
+# electron/vendor/aria2/ 下必须有：aria2c.exe + COPYING + LICENSE.OpenSSL + SOURCE-OFFER.txt
 __pycache__/
 /electron/__pycache__/
 

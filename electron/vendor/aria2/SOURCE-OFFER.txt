@@ -1,0 +1,50 @@
+GameIntel 随包分发的第三方二进制 —— 来源与源码获取方式
+================================================================
+
+本目录下的 aria2c.exe 是 **aria2** 的未经修改的官方构建产物。
+
+  程序名    : aria2
+  版本      : 1.37.0
+  许可证    : GNU General Public License v2 (GPLv2)
+  许可证全文: 见本目录 COPYING
+  OpenSSL   : 见本目录 LICENSE.OpenSSL
+  作者列表  : 见本目录 AUTHORS
+
+  官方发布页: https://github.com/aria2/aria2/releases/tag/release-1.37.0
+  本包所用构建: aria2-1.37.0-win-64bit-build1.zip
+  下载地址    : https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip
+  aria2c.exe 大小 / 校验:
+      size   = 5649408 bytes
+      sha256 = be2099c214f63a3cb4954b09a0becd6e2e34660b886d4c898d260febfe9d70c2
+
+----------------------------------------------------------------
+如何取得对应源码（GPLv2 第 3 条要求的「提供源码」）
+----------------------------------------------------------------
+
+本程序**未做任何修改**，因此其对应源码即为该版本的上游源码：
+
+  源码包（官方，与二进制同版本）:
+    https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz
+    https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.gz
+
+  源码仓库:
+    https://github.com/aria2/aria2  （标签 release-1.37.0）
+
+如无法通过网络获取，可向本程序的分发者书面索取，分发者应当在
+GPLv2 第 3 条(b)项允许的范围内提供对应的完整源码。
+
+----------------------------------------------------------------
+调用方式说明（为什么本程序不构成「衍生作品」）
+----------------------------------------------------------------
+
+本程序（GameIntel）与 aria2 是**两个独立的可执行进程**：
+
+  · aria2c.exe 由主进程以 `child_process.spawn` 启动，**不加载、不链接**其任何代码；
+  · 两者之间只通过 **本地回环 (127.0.0.1) 上的 JSON-RPC 文本协议**通信；
+  · aria2c 的 RPC 强制 `--rpc-listen-all=false`（只绑回环）+ 每次启动随机 secret +
+    `--rpc-allow-origin-all=false`。
+
+这种「独立进程 + 公开的进程间协议」的调用方式，按 FSF 的一贯解释属于
+**聚合（mere aggregation）**，不使本程序的其余部分被 GPLv2 覆盖。
+但 aria2c.exe 本身仍完整受 GPLv2 约束 —— 故随包附带 COPYING、
+保留其原始版权声明，并提供上述源码获取方式。

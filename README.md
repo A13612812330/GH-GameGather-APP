@@ -1,4 +1,8 @@
-# 游戏情报客户端（GameIntel）
+# GH-GameGather APP
+
+> 原名「游戏情报客户端 / GameIntel」，**2026-10-26 定名 GH-GameGather APP**（移交版）。
+> 代码目录名、exe 名与包内路径仍沿用 `GameIntel`，未做重命名 —— 改名会让打包脚本与既有验证指纹全部失效，
+> 详见 [`HANDOVER-GH-GameGather-APP.md`](./HANDOVER-GH-GameGather-APP.md) §六。
 
 本地优先的 **PC / 手游情报站 + 资源检索 + 桌面下载管理**。最终产物是一个双击即用的 Windows 桌面应用：
 `dist\GameIntel\GameIntel.exe`。
@@ -53,9 +57,9 @@ flowchart LR
 ```
 .
 ├─ demo/                      前端原型（单文件，无构建、无依赖）
-│  ├─ index.html              全部 UI + 逻辑（6,311 行 / 376 KB）
+│  ├─ index.html              全部 UI + 逻辑（6,448 行 / 376 KB）
 │  ├─ data.js                 离线数据快照（497 KB）
-│  ├─ _t_demo.js              jsdom 行为断言（792 条）
+│  ├─ _t_demo.js              jsdom 行为断言（803 条）
 │  ├─ _shot.py                Chrome CDP 截图（不依赖 PIL）
 │  ├─ _contrast_v25.py        深色色板对比度核验
 │  └─ README.md               原型实现细节与验证记录
@@ -64,8 +68,10 @@ flowchart LR
 │  ├─ preload.js              contextBridge 白名单
 │  ├─ aria2.js                aria2 JSON-RPC 封装
 │  ├─ pack.py                 打包脚本，产出 dist/GameIntel
+│  ├─ vendor/aria2/           aria2c.exe 5.4 MB + GPLv2 三件（2026-10-26 起入库）
 │  ├─ _t_shell.js             壳契约断言（73 条）
 │  └─ _t_aria2.js             引擎断言（27 条）
+├─ HANDOVER-GH-GameGather-APP.md  移交说明（接手先读这一份）
 ├─ exe-preview/index.html     版本实拍档案页（截图未入库，见 §六）
 ├─ SOP-游戏情报客户端.md       规范与红线
 ├─ PLAN-游戏情报客户端.md      方案与模块（M0–M13）
@@ -88,7 +94,7 @@ flowchart LR
 ### 跑断言
 
 ```bash
-# 页面行为断言（jsdom，792 条）
+# 页面行为断言（jsdom，803 条）
 cd demo && NODE_PATH=<jsdom 所在目录> node _t_demo.js
 
 # 壳契约（73 条）+ 引擎（27 条）
@@ -104,7 +110,7 @@ cd electron && node _t_shell.js && node _t_aria2.js
 python electron/pack.py
 ```
 
-产物 `dist/GameIntel/`（约 **620 MB**，21 个条目）。
+产物 `dist/GameIntel/`（**10,100 个文件 / 591.3 MB**，顶层 22 个条目）。
 
 > **不是绿色单文件**：只拷 `GameIntel.exe` 会报 `Invalid file descriptor to ICU data received.`，
 > 补上 `icudtl.dat` 又换报 `Error loading V8 startup snapshot file`。
@@ -150,15 +156,17 @@ env -u ELECTRON_RUN_AS_NODE ./node_modules/electron/dist/electron.exe . --shot=E
 
 | 项 | 说明 |
 |---|---|
-| **上游聚合服务** | 独立项目，本仓库**不含**它的源码（只读依赖）。成品打包时从本机只读拷贝进包。 |
+| **上游聚合服务** | 独立项目，本仓库**不含**它的源码（只读依赖）。成品打包时从本机只读拷贝进包。⚠️ **没有它就只能看离线快照**，移交时须单独提供。 |
 | **网盘下载** | 外挂 OpenList / AList，**只调用它的 API**。对方是 AGPL ⇒ **只调用、不分发、不打包**。 |
-| **aria2** | GPLv2。第三方二进制不入库，打包脚本从本机 `electron/vendor/` 取；随包分发须附 LICENSE 与源码/offer。 |
+| **aria2** | GPLv2。`electron/vendor/aria2/` **已入库**（2026-10-26 起），内含 `aria2c.exe` + `COPYING` + `LICENSE.OpenSSL` + `SOURCE-OFFER.txt`，`pack.py` 直接取用。 |
 | **截图** | `exe-preview/shots/`（77 张 / 35 MB）**未入库**。需要时本地重拍；因此 `exe-preview/index.html` 在 GitHub 上会有空图位。 |
 | **游戏文件** | 一律不托管、不转发。资源条目只做索引与跳转。 |
 
 ---
 
 ## 七、给接手的人三句话
+
+> 完整的接手手册见 **[`HANDOVER-GH-GameGather-APP.md`](./HANDOVER-GH-GameGather-APP.md)** —— 环境、打包、缺什么、红线、常见故障都在里面。
 
 1. **先比 md5 再决定要不要重跑验证** —— 指纹一致说明代码没变，既有结论继续有效（见 `NEXT` §0 现状锚点）。
 2. **断言只守得住「实现符合设计」，守不住「设计本身想错了」** —— 交互链路必须实拍，而且探针要走用户真实点击那条路径。
