@@ -36,6 +36,12 @@ __pycache__/
 /exe-preview/shots*/
 /exe-preview/crops/
 
+# ── 内部材料：2026-10-26 仓库转公开时剔除（本地保留，不入库）─────
+# 内部决策与踩坑记录，属工作过程材料
+/.workbuddy/
+# 对第三方商业产品的逆向分析，公开有风险
+/REF-*.md
+
 # ── 移交导出物（bundle / 源码 zip，2026-10-26 起）────────
 /_handover/
 
