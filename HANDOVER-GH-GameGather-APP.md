@@ -13,6 +13,22 @@
 
 只做**信息聚合与索引**，不托管、不分发任何游戏文件；所有条目指向原始出处，下载能力只覆盖**磁力/BT 与真实直链**。
 
+### 0.1 只有仓库链接能做到哪一步（读这一格就够）
+
+**仓库是纯源码，不含运行时、不含数据服务、不含成品。** 所以「把链接丢给 AI 让它跑」只到第 2 行：
+
+| 想达到 | 只给链接够不够 | 还缺什么 |
+|---|---|---|
+| 读代码 / 改代码 / 让 AI 帮你继续开发 | ✅ **够了** | `git clone` 即可，无构建步骤 |
+| 看界面长什么样（离线原型） | ✅ **够了** | 双击 `demo/index.html`，0 依赖，走 `demo/data.js` 快照（2026-10-15 打包时点） |
+| 跑原生桌面窗口 | ❌ 不够 | ① `cd electron && npm i`（拉 Electron 39.8.10，约 200 MB）② **上游 `game-aggregator`**（不在本仓库） |
+| 有实时数据（搜索 / 详情 / 评分 / 榜单刷新） | ❌ 不够 | **只能由上游提供**，没有它整站退化为离线快照 |
+| 自己打 exe | ❌ 不够 | 上面两样 + Python 3.11+（跑 `electron/pack.py`） |
+| 直接双击就用 | ❌ 不够 | 要拿 `dist/GameIntel/` 整个目录（591.3 MB），或等一个安装包（N-21 未做） |
+
+> **结论一句话**：代码可以立刻交接，**数据与成品不能**。真正的缺口只有一个 —— 上游 `game-aggregator`。
+> 它是独立项目，运行时由壳以子进程拉起（`GAMEHUB_ROOT` 指定路径），本仓库只读依赖它。
+
 ---
 
 ## 1. 拿到了什么、没拿到什么
@@ -29,7 +45,7 @@
 | 打包脚本 | `electron/pack.py` | 纯标准库，产出 `dist/GameIntel` |
 | **aria2 引擎** | `electron/vendor/aria2/` | `aria2c.exe` 5.4 MB + GPLv2 三件（`COPYING` / `LICENSE.OpenSSL` / `SOURCE-OFFER.txt`） |
 | 图标素材 | `electron-intel/assets/` | `icon.ico` 等，`pack.py` 会用它烧图标 |
-| 方案与决策 | `SOP` / `PLAN` / `NEXT` / `PACK` / `REF` 五份 md | 规范、方案、待办、打包实录、第三方逆向 |
+| 方案与决策 | `SOP` / `PLAN` / `NEXT` / `PACK` 四份 md | 规范与红线、方案与模块、待办与现状锚点、exe 打包逐版实录 |
 
 ### 1.2 **不在**仓库里（必须单独拿）
 
@@ -67,12 +83,15 @@ cd electron
 npm install                                   # 装 electron 39.8.10
 
 # 上游在哪：默认找 <项目根上一级>/2026-09-03-16-11-58/game-aggregator
-# 路径不一样就显式指定：
+# 路径不一样就显式指定（Git Bash / PowerShell 用 export / $env:，cmd 用 set）
 export GAMEHUB_ROOT="D:/path/to/game-aggregator"
 
 # ★ 必须先清掉这个环境变量，否则主进程会退化成纯 Node，require('electron') 拿到的是路径字符串
 env -u ELECTRON_RUN_AS_NODE ./node_modules/electron/dist/electron.exe .
 ```
+
+> 上游目录只需含 `server.js` / `shared.js` / `package.json` / `data` / `fetchers` / `public` / `node_modules` 这 7 项
+> —— 即 `pack.py` 会拷进包里的那些。开发期的 `_ref` / `_bak` / `_probe` 之类一律不需要。
 
 冒烟（不开窗，只验 fork / 探活 / 清理）：
 
